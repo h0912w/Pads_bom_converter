@@ -1,3 +1,5 @@
+<!--VERSION: 006-->
+
 <section id="pads-bom-converter" style="border-radius: 14px; border: 1px solid rgb(229, 231, 235); font-family: system-ui, -apple-system, &quot;Segoe UI&quot;, Roboto, Arial, sans-serif; margin: 20px auto; max-width: 1040px; padding: 20px;">
 
   <h1 style="margin: 0px 0px 8px;">PADS BOM Converter for Digi-Key &amp; Mouser</h1>
@@ -17,7 +19,7 @@
     </p>
   </div>
 
-  <hr style="border-bottom: 0px; border-image: initial; border-left: 0px; border-right: 0px; border-top: 1px solid rgb(229, 231, 235); border: 0; margin: 18px 0px;" />
+  <hr style="border-bottom: 0px; border-image: initial; border-left: 0px; border-right: 0px; border-top: 1px solid rgb(229, 231, 235); border: 0px; margin: 18px 0px;" />
 
   <h2 style="margin: 0px 0px 10px;">Typical PADS BOM Cleanup Problems</h2>
   <ul style="color: #374151; line-height: 1.7; margin: 0px 0px 14px 18px;">
@@ -34,18 +36,18 @@
 
   <!--✅ Apps Script Web App iframe-->
   <div style="background: rgb(255, 255, 255); border-radius: 14px; border: 1px solid rgb(229, 231, 235); overflow: hidden;">
-    <iframe id="padsBomIframe" loading="lazy" referrerpolicy="no-referrer-when-downgrade" src="https://script.google.com/macros/s/AKfycbxLmMwUBJK5Cm-egChp-5yc9rzrDVVucAdhwN1I53_2jppdsLEFGLwV7JvVNAz7WVgP7Q/exec" style="border: 0; display: block; height: 760px; width: 100%;" title="PADS BOM upload tool (Apps Script Web App)">
+    <iframe id="padsBomIframe" loading="lazy" referrerpolicy="no-referrer-when-downgrade" src="https://script.google.com/macros/s/AKfycbxjdY33pK0vUk5MkbnEdbrNCFg2hqjQFM1y6GdjRUQH7jLGjmg1X6Njr43sH0nTX3W1VA/exec" style="border: 0; display: block; height: 760px; width: 100%;" title="PADS BOM upload tool (Apps Script Web App)">
     </iframe>
   </div>
 
   <p style="color: #6b7280; font-size: 13px; line-height: 1.6; margin: 10px 0px 0px;">
     If the embedded tool does not load, open it directly:
-    <a href="https://script.google.com/macros/s/AKfycbxLmMwUBJK5Cm-egChp-5yc9rzrDVVucAdhwN1I53_2jppdsLEFGLwV7JvVNAz7WVgP7Q/exec" rel="noopener noreferrer" target="_blank">
-      https://script.google.com/macros/s/AKfycbxLmMwUBJK5Cm-egChp-5yc9rzrDVVucAdhwN1I53_2jppdsLEFGLwV7JvVNAz7WVgP7Q/exec
+    <a href="https://script.google.com/macros/s/AKfycbxjdY33pK0vUk5MkbnEdbrNCFg2hqjQFM1y6GdjRUQH7jLGjmg1X6Njr43sH0nTX3W1VA/exec" rel="noopener noreferrer" target="_blank">
+      https://script.google.com/macros/s/AKfycbxjdY33pK0vUk5MkbnEdbrNCFg2hqjQFM1y6GdjRUQH7jLGjmg1X6Njr43sH0nTX3W1VA/exec
     </a>
   </p>
 
-  <hr style="border-bottom: 0px; border-image: initial; border-left: 0px; border-right: 0px; border-top: 1px solid rgb(229, 231, 235); border: 0; margin: 18px 0px;" />
+  <hr style="border-bottom: 0px; border-image: initial; border-left: 0px; border-right: 0px; border-top: 1px solid rgb(229, 231, 235); border: 0px; margin: 18px 0px;" />
 
   <h2 style="margin: 18px 0px 10px;">2) Convert (Coming Soon)</h2>
 
@@ -63,7 +65,7 @@
     Next step will be: detect columns → let you select “MPN / Quantity / Manufacturer” → generate upload-ready text/CSV.
   </p>
 
-  <hr style="border-bottom: 0px; border-image: initial; border-left: 0px; border-right: 0px; border-top: 1px solid rgb(229, 231, 235); border: 0; margin: 18px 0px;" />
+  <hr style="border-bottom: 0px; border-image: initial; border-left: 0px; border-right: 0px; border-top: 1px solid rgb(229, 231, 235); border: 0px; margin: 18px 0px;" />
 
   <h2 style="margin: 18px 0px 10px;">3) Upload Links</h2>
   <p style="color: #374151; line-height: 1.6; margin: 0px 0px 8px;">
@@ -80,7 +82,7 @@
     </a>
   </div>
 
-  <hr style="border-bottom: 0px; border-image: initial; border-left: 0px; border-right: 0px; border-top: 1px solid rgb(229, 231, 235); border: 0; margin: 18px 0px;" />
+  <hr style="border-bottom: 0px; border-image: initial; border-left: 0px; border-right: 0px; border-top: 1px solid rgb(229, 231, 235); border: 0px; margin: 18px 0px;" />
 
   <h2 style="margin: 18px 0px 10px;">Notes</h2>
   <ul style="color: #374151; line-height: 1.7; margin: 0px 0px 10px 18px;">
