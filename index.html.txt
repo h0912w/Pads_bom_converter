@@ -15,14 +15,16 @@
     pre{background:#f9fafb;border:1px solid #e5e7eb;border-radius:12px;padding:10px;overflow:auto;}
     .muted{color:#6b7280;font-size:13px;}
     .row{display:flex;gap:10px;align-items:center;flex-wrap:wrap;}
-    .grid{display:grid;grid-template-columns: 1fr;gap:12px;}
+    .grid{display:grid;grid-template-columns: 1.35fr 0.85fr;gap:12px;align-items:start;}
     .pill{display:inline-block;padding:4px 10px;border:1px solid #e5e7eb;border-radius:999px;font-size:12px;color:#111827;background:#f9fafb;}
     .warn{color:#b45309;font-size:13px;white-space:pre-wrap;}
     .ok{color:#065f46;font-size:13px;white-space:pre-wrap;}
+    .small{font-size:12px;color:#6b7280;}
+    code{background:#f3f4f6;padding:1px 6px;border-radius:6px;}
 
     .tableWrap{
-      border:1px solid #e5e7eb;border-radius:14px;overflow:auto;max-height:520px;
-      position:relative;
+      border:1px solid #e5e7eb;border-radius:14px;overflow:auto;max-height:560px;
+      position:relative;background:#fff;
     }
     table{border-collapse:collapse;width:100%;min-width:920px;}
     th, td{border-bottom:1px solid #f1f5f9;border-right:1px solid #f1f5f9;padding:6px 8px;font-size:13px;white-space:nowrap;}
@@ -37,27 +39,45 @@
 
     td.clickable{cursor:pointer;}
 
-    .mapBox{border:1px solid #e5e7eb;border-radius:14px;padding:12px;background:#fff;}
-    .small{font-size:12px;color:#6b7280;}
-
-    .note{font-size:12px;color:#6b7280;margin-top:8px;line-height:1.5;}
-    code{background:#f3f4f6;padding:1px 6px;border-radius:6px;}
+    .mapBox{
+      border:1px solid #e5e7eb;border-radius:14px;padding:12px;background:#fff;
+      position:sticky; top:12px;
+    }
 
     select{
       padding:8px 10px;border:1px solid #e5e7eb;border-radius:10px;background:#fff;
       font-size:13px;color:#111827;
+      max-width:100%;
     }
     label{font-size:13px;color:#111827;}
+
+    .note{
+      font-size:12px;color:#6b7280;margin-top:8px;line-height:1.5;
+    }
+
+    .btnRow{display:flex;gap:10px;flex-wrap:wrap;margin-top:12px;}
+    .btnSecondary{
+      background:#ffffff;color:#111827;border:1px solid #e5e7eb;
+    }
+
+    .sectionTitle{
+      margin:0 0 8px;font-size:14px;color:#111827;
+    }
+
+    .divider{
+      border:0;border-top:1px solid #e5e7eb;margin:12px 0;
+    }
   </style>
 </head>
 <body>
   <h1>EDA BOM Converter (Mouser / Digi-Key)</h1>
   <p class="muted">
-    Upload → Preview → <b>Click header row only</b> → (Auto-detect + Dropdown override) → Convert → Download
+    Upload → Preview → Click <b>Header Row</b> → (Auto-detect + Dropdown override) → Convert & Download
   </p>
 
+  <!-- Step 1: File upload -->
   <div class="card">
-    <h2>1) Select file</h2>
+    <h2 style="margin:0 0 10px;">1) Select file</h2>
     <input id="file" type="file" accept=".csv,.txt,.tsv,.xls,.xlsx" />
     <p class="muted" id="fileInfo"></p>
 
@@ -68,51 +88,64 @@
     </div>
   </div>
 
+  <!-- Step 2: Preview + Convert in ONE screen -->
   <div class="card" id="previewCard" style="display:none;">
-    <h2>2) Preview</h2>
-
-    <div class="row" style="margin:8px 0 12px;">
-      <span class="muted" id="guideText">Guide: Click the <b>header row</b> in the table. (Any cell selects the whole row)</span>
-    </div>
+    <h2 style="margin:0 0 10px;">2) Preview & Convert (one screen)</h2>
+    <p class="muted" id="guideText" style="margin:0 0 12px;">
+      Guide: Click the <b>header row</b> in the table. (Click any cell to select the whole row)
+    </p>
 
     <div class="grid">
-      <div class="tableWrap" id="tableWrap"></div>
+      <!-- Left: table -->
+      <div>
+        <div class="tableWrap" id="tableWrap"></div>
 
+        <h3 style="margin:14px 0 8px;">Server Response (debug)</h3>
+        <pre id="out">{}</pre>
+      </div>
+
+      <!-- Right: ALL actions -->
       <div class="mapBox">
+        <div class="sectionTitle">Selection state</div>
         <div class="small" id="headerPickState">Header row: not selected</div>
+        <div class="small" id="autoMapText" style="margin-top:8px;">-</div>
+
+        <div class="divider"></div>
+
+        <div class="sectionTitle">Column mapping</div>
+        <div class="row" style="margin-top:8px;">
+          <label for="mpnSelect"><b>MPN column</b></label>
+          <select id="mpnSelect" disabled></select>
+        </div>
+        <div class="row" style="margin-top:8px;">
+          <label for="qtySelect"><b>Quantity column</b></label>
+          <select id="qtySelect" disabled></select>
+        </div>
 
         <div class="row" style="margin-top:10px;">
           <label class="small"><input type="checkbox" id="chkAgg" /> Aggregate same MPN (sum Quantity)</label>
         </div>
 
-        <hr style="border:0;border-top:1px solid #e5e7eb;margin:14px 0;">
+        <div class="divider"></div>
 
-        <div class="small"><b>Column mapping</b></div>
-
-        <div class="row" style="margin-top:10px;">
-          <label for="mpnSelect"><b>MPN column</b></label>
-          <select id="mpnSelect" disabled></select>
-
-          <label for="qtySelect" style="margin-left:8px;"><b>Quantity column</b></label>
-          <select id="qtySelect" disabled></select>
-        </div>
-
-        <div class="small" id="autoMapText" style="margin-top:10px;">-</div>
-
-        <div class="note" style="margin-top:10px;">
-          <b>MPN sample (first 5 rows from data start):</b>
-          If all blank, you can still convert — you’ll be asked to confirm.
+        <div class="sectionTitle">MPN sample check</div>
+        <div class="note">
+          Showing first 5 MPN values from the inferred data start row.
+          If they are all blank, you can still convert — you will be asked to confirm.
         </div>
         <pre id="mpnSamples" style="margin-top:10px;">(no samples)</pre>
-
         <div id="sampleWarn" class="warn" style="margin-top:8px;display:none;"></div>
         <div id="sampleOk" class="ok" style="margin-top:8px;display:none;"></div>
 
-        <div class="note" style="margin-top:10px;">
-          <b>Digi-Key output:</b> Header on row 2, Column A = <b>Manufacturer Product Number</b>, Column B = <b>Quantity</b>.
+        <div class="divider"></div>
+
+        <div class="sectionTitle">Convert & Download</div>
+        <div class="note">
+          <b>Digi-Key output:</b> Row 1 blank, header on Row 2, and headers must be exactly:
+          <b>Manufacturer Product Number</b>, <b>Quantity</b>.
         </div>
 
-        <div class="row" style="margin-top:14px;">
+        <div class="btnRow">
           <button id="btnConvertMouser" disabled>Convert & Download (Mouser .xlsx)</button>
           <button id="btnConvertDigikey" disabled>Convert & Download (Digi-Key .xlsx)</button>
         </div>
@@ -124,11 +157,12 @@
           <p class="muted" style="margin:0;">If auto-download is blocked, click below.</p>
           <a id="downloadLink" href="#" download="">Download output.xlsx</a>
         </div>
+
+        <div class="divider"></div>
+
+        <button class="btnSecondary" id="btnReset" type="button">Reset</button>
       </div>
     </div>
-
-    <h3>Server Response (debug)</h3>
-    <pre id="out">{}</pre>
   </div>
 
 <script>
@@ -145,12 +179,12 @@
 
   const guideText = document.getElementById('guideText');
   const headerPickState = document.getElementById('headerPickState');
+  const autoMapText = document.getElementById('autoMapText');
 
   const chkAgg = document.getElementById('chkAgg');
 
   const mpnSelect = document.getElementById('mpnSelect');
   const qtySelect = document.getElementById('qtySelect');
-  const autoMapText = document.getElementById('autoMapText');
 
   const mpnSamplesEl = document.getElementById('mpnSamples');
   const sampleWarn = document.getElementById('sampleWarn');
@@ -162,6 +196,8 @@
   const warningsEl = document.getElementById('warnings');
   const downloadArea = document.getElementById('downloadArea');
   const downloadLink = document.getElementById('downloadLink');
+
+  const btnReset = document.getElementById('btnReset');
 
   const MAX_BYTES = 8 * 1024 * 1024;
 
@@ -201,7 +237,6 @@
     sampleWarn.style.display = 'none';
     sampleOk.style.display = 'none';
 
-    // Convert buttons disabled until header is chosen & dropdowns ready
     btnConvertMouser.disabled = true;
     btnConvertDigikey.disabled = true;
 
@@ -210,9 +245,17 @@
     mpnSelect.disabled = true;
     qtySelect.disabled = true;
 
-    guideText.innerHTML = 'Guide: Click the <b>header row</b> in the table. (Any cell selects the whole row)';
+    guideText.innerHTML = 'Guide: Click the <b>header row</b> in the table. (Click any cell to select the whole row)';
     setStage('idle');
   }
+
+  btnReset.addEventListener('click', () => {
+    resetAll();
+    previewCard.style.display = 'none';
+    statusEl.textContent = '';
+    fileEl.value = '';
+    fileInfoEl.textContent = '';
+  });
 
   fileEl.addEventListener('change', () => {
     const f = fileEl.files && fileEl.files[0];
@@ -381,8 +424,8 @@
     const qtyHeader = headerCells[qtyColIndex] || '(blank)';
 
     autoMapText.innerHTML =
-      `MPN: <code>col ${mpnColIndex+1}</code> (${escapeHtml(mpnHeader)}) / ` +
-      `QTY: <code>col ${qtyColIndex+1}</code> (${escapeHtml(qtyHeader)}) / ` +
+      `MPN: <code>col ${mpnColIndex+1}</code> (${escapeHtml(mpnHeader)})<br>` +
+      `QTY: <code>col ${qtyColIndex+1}</code> (${escapeHtml(qtyHeader)})<br>` +
       `Data starts at <code>row ${effectiveDataStartRowIndex+1}</code>`;
 
     const samples = buildMpnSamples(values, effectiveDataStartRowIndex, mpnColIndex, 5);
@@ -391,7 +434,6 @@
     const blank = isAllBlankSamples(samples);
     lastMpnSamplesBlank = blank;
 
-    // ✅ Convert 비활성화는 하지 않음. 대신 경고 문구만 표시.
     if (blank) {
       sampleWarn.style.display = 'block';
       sampleWarn.textContent =
@@ -403,7 +445,7 @@
       sampleOk.textContent = 'MPN samples detected. You can convert.';
     }
 
-    // ✅ 헤더 선택만 되면 Convert 버튼은 활성
+    // Header selected => Convert buttons enabled (not disabled by sample)
     btnConvertMouser.disabled = false;
     btnConvertDigikey.disabled = false;
 
@@ -444,7 +486,7 @@
     mpnSelect.value = String(mpnColIndex);
     qtySelect.value = String(qtyColIndex);
 
-    guideText.innerHTML = 'Guide: Header row selected ✅ Auto-detected mapping is applied. You can override via dropdown.';
+    guideText.innerHTML = 'Guide: Header row selected ✅ Auto-detected mapping applied. You can override via dropdown.';
     refreshMappingAndSamples();
   }
 
@@ -491,7 +533,7 @@
             renderTable(preview.values);
 
             statusEl.textContent = 'Preview ready ✅';
-            guideText.innerHTML = 'Guide: Click the <b>header row</b> in the table. (Any cell selects the whole row)';
+            guideText.innerHTML = 'Guide: Click the <b>header row</b> in the table. (Click any cell to select the whole row)';
             setStage('preview');
           } else {
             statusEl.textContent = 'Failed ❌ (no preview)';
@@ -530,6 +572,8 @@
       token,
       mapping: {
         headerRowIndex,
+        mpnColIndex,
+        qtyColIndex,
         aggregateSameMpn: chkAgg.checked
       }
     };
@@ -572,7 +616,7 @@
       setStage('error');
     }
 
-    // 헤더 선택 상태면 다시 활성
+    // Re-enable (header chosen)
     btnConvertMouser.disabled = (headerRowIndex === null);
     btnConvertDigikey.disabled = (headerRowIndex === null);
   }

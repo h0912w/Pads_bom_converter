@@ -1,4 +1,4 @@
-<!--VERSION: 016-->
+<!--VERSION: 018-->
 
 <section id="eda-bom-converter" style="border-radius:14px;border:1px solid #e5e7eb;font-family:system-ui,-apple-system,&quot;Segoe UI&quot;,Roboto,Arial,sans-serif;margin:20px auto;max-width:1040px;padding:20px;">
 
@@ -47,17 +47,17 @@
       id="edaBomIframe"
       loading="lazy"
       referrerpolicy="no-referrer-when-downgrade"
-      src="https://script.google.com/macros/s/AKfycbwYklqU9yORDGiEghbFy2HhKfnAlzD70ZPZHP8rZ48dtCnGWMHw-hxL19vuNYE18JTzuA/exec"
-      style="border:0;display:block;height:980px;width:100%;"
+      src="https://script.google.com/macros/s/AKfycby1WWGYASJh-yq_LSL7N5EhatQzCkxosCmdgtlJwxlEDHkCufX9othwHROP5dZU7nNOew/exec"
+      style="border:0;display:block;height:1100px;width:100%;"
       title="EDA BOM Converter (Apps Script Web App)"></iframe>
   </div>
 
   <p style="color:#6b7280;font-size:13px;line-height:1.6;margin:10px 0 0;">
     If the embedded tool does not load, open it directly:
     <a
-      href="https://script.google.com/macros/s/AKfycbwYklqU9yORDGiEghbFy2HhKfnAlzD70ZPZHP8rZ48dtCnGWMHw-hxL19vuNYE18JTzuA/exec"
+      href="https://script.google.com/macros/s/AKfycby1WWGYASJh-yq_LSL7N5EhatQzCkxosCmdgtlJwxlEDHkCufX9othwHROP5dZU7nNOew/exec"
       rel="noopener noreferrer"
-      target="_blank">https://script.google.com/macros/s/AKfycbwYklqU9yORDGiEghbFy2HhKfnAlzD70ZPZHP8rZ48dtCnGWMHw-hxL19vuNYE18JTzuA/exec</a>
+      target="_blank">https://script.google.com/macros/s/AKfycby1WWGYASJh-yq_LSL7N5EhatQzCkxosCmdgtlJwxlEDHkCufX9othwHROP5dZU7nNOew/exec</a>
   </p>
 
   <hr style="border:0;border-top:1px solid #e5e7eb;margin:18px 0;" />
