@@ -1,0 +1,267 @@
+/**
+ * [Improvements Summary (User-facing)]
+ * 1) After upload, a preview table is shown and the UI auto-jumps to likely header rows (highlight + scroll).
+ * 2) Mapping is done by clicking one MPN cell and one QTY cell in the table.
+ * 3) Clicking Convert generates a Mouser BOM template (.xlsx) and downloads it immediately.
+ * 4) (Important fix) Some environments can throw an exception like:
+ *    "HTTP 200 + PK..." when using Advanced Drive Service export (alt=media).
+ *    So export is implemented via UrlFetchApp instead of Drive.Files.export.
+ *
+ * [Notes]
+ * - Requires Advanced Google Drive Service (Drive API v3) enabled. (Drive.Files.copy)
+ * - Export uses UrlFetchApp, so it requires the script.external_request OAuth scope.
+ * - After code changes, redeploy:
+ *   Deploy → Manage deployments → Edit → New version → Deploy
+ *   to apply changes to /exec.
+ */
+
+function doGet() {
+  return HtmlService.createHtmlOutputFromFile('Index')
+    .setTitle('BOM → Mouser Template Converter')
+    .setXFrameOptionsMode(HtmlService.XFrameOptionsMode.ALLOWALL);
+}
+
+const MOUSER_HEADERS = [
+  "Mfr Part Number (Input)",
+  "Manufacturer Part Number",
+  "Mouser Part Number",
+  "Manufacturer Name",
+  "Description",
+  "Quantity 1",
+  "Unit Price 1",
+  "Quantity 2",
+  "Unit Price 2",
+  "Quantity 3",
+  "Unit Price 3",
+  "Quantity 4",
+  "Unit Price 4",
+  "Quantity 5",
+  "Unit Price 5",
+  "Order Quantity",
+  "Order Unit Price",
+  "Min./Mult.",
+  "Availability",
+  "Lead Time in Days",
+  "Lifecycle",
+  "NCNR",
+  "RoHS",
+  "Pb Free",
+  "Package Type",
+  "Datasheet URL",
+  "Product Image",
+  "Design Risk"
+];
+
+const MAX_BYTES = 8 * 1024 * 1024; // 8MB
+
+function uploadAndGetPreview(payload) {
+  try {
+    if (!payload || !payload.dataUrl) return { ok: false, error: "No file data received." };
+
+    const filename = String(payload.filename || "uploaded_file");
+    const mimeType = String(payload.mimeType || "application/octet-stream");
+    const dataUrl = String(payload.dataUrl);
+
+    const commaIndex = dataUrl.indexOf(",");
+    if (commaIndex < 0) return { ok: false, error: "Invalid dataUrl format (missing comma)." };
+
+    const header = dataUrl.slice(0, commaIndex);
+    const base64 = dataUrl.slice(commaIndex + 1);
+    if (!header.includes(";base64")) return { ok: false, error: "Invalid dataUrl header (missing ;base64)." };
+
+    const bytes = Utilities.base64Decode(base64);
+    const sizeBytes = bytes.length;
+    if (sizeBytes > MAX_BYTES) {
+      return { ok: false, error: `File too large: ${sizeBytes} bytes (limit: ${MAX_BYTES} bytes).` };
+    }
+
+    // 1) Save the uploaded file temporarily
+    const blob = Utilities.newBlob(bytes, mimeType, filename);
+    const srcFile = DriveApp.createFile(blob);
+
+    // 2) Convert to Google Sheets (Drive API v3 Advanced Service)
+    const converted = Drive.Files.copy(
+      { title: filename, mimeType: MimeType.GOOGLE_SHEETS },
+      srcFile.getId()
+    );
+    const sheetId = converted.id;
+
+    // 3) Read preview (top portion only)
+    const ss = SpreadsheetApp.openById(sheetId);
+    const sh = ss.getSheets()[0];
+
+    const lastRow = sh.getLastRow();
+    const lastCol = sh.getLastColumn();
+    if (lastRow < 1 || lastCol < 1) {
+      return { ok: false, error: "No data detected in the sheet.", token: { srcFileId: srcFile.getId(), sheetId } };
+    }
+
+    const PREVIEW_ROWS = Math.min(120, lastRow);
+    const PREVIEW_COLS = Math.min(40, lastCol);
+    const values = sh.getRange(1, 1, PREVIEW_ROWS, PREVIEW_COLS).getValues();
+
+    return {
+      ok: true,
+      token: { srcFileId: srcFile.getId(), sheetId },
+      preview: { values, rowCount: PREVIEW_ROWS, colCount: PREVIEW_COLS },
+      serverTime: new Date().toISOString()
+    };
+  } catch (err) {
+    return { ok: false, error: String(err) };
+  }
+}
+
+/**
+ * Key point: Export Google files via UrlFetchApp instead of Advanced Drive export
+ * to avoid some "HTTP 200 + PK..." exception cases.
+ */
+function exportGoogleFileAsXlsxBlob_(fileId, filenameForBlob) {
+  const exportMime = "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet";
+  const url =
+    "https://www.googleapis.com/drive/v3/files/" +
+    encodeURIComponent(fileId) +
+    "/export?mimeType=" +
+    encodeURIComponent(exportMime);
+
+  const params = {
+    method: "get",
+    headers: { Authorization: "Bearer " + ScriptApp.getOAuthToken() },
+    muteHttpExceptions: true
+  };
+
+  const res = UrlFetchApp.fetch(url, params);
+  const code = res.getResponseCode();
+
+  if (code !== 200) {
+    return { ok: false, error: "Drive export failed. HTTP " + code + " / " + res.getContentText() };
+  }
+
+  const blob = res.getBlob().setName(filenameForBlob || "mouser_bom.xlsx");
+  return { ok: true, blob, mimeType: exportMime };
+}
+
+function convertToMouserTemplate(req) {
+  try {
+    if (!req || !req.token || !req.token.sheetId) return { ok: false, error: "Missing token.sheetId" };
+    if (!req.mapping) return { ok: false, error: "Missing mapping" };
+
+    const sheetId = String(req.token.sheetId);
+    const headerRowIndex = Number(req.mapping.headerRowIndex);
+    const dataStartRowIndex = Number(req.mapping.dataStartRowIndex);
+    const mpnColIndex = Number(req.mapping.mpnColIndex);
+    const qtyColIndex = Number(req.mapping.qtyColIndex);
+    const aggregateSameMpn = !!req.mapping.aggregateSameMpn;
+
+    if (!isFinite(headerRowIndex) || headerRowIndex < 0) return { ok: false, error: "Invalid headerRowIndex" };
+    if (!isFinite(dataStartRowIndex) || dataStartRowIndex < 0) return { ok: false, error: "Invalid dataStartRowIndex" };
+    if (!isFinite(mpnColIndex) || mpnColIndex < 0) return { ok: false, error: "Invalid mpnColIndex" };
+    if (!isFinite(qtyColIndex) || qtyColIndex < 0) return { ok: false, error: "Invalid qtyColIndex" };
+
+    const inSS = SpreadsheetApp.openById(sheetId);
+    const inSh = inSS.getSheets()[0];
+    const lastRow = inSh.getLastRow();
+    const lastCol = inSh.getLastColumn();
+    if (lastRow < 1 || lastCol < 1) return { ok: false, error: "No data in source sheet." };
+
+    const startRow1 = dataStartRowIndex + 1; // 1-based
+    if (startRow1 > lastRow) return { ok: false, error: "Data start row is beyond last row." };
+
+    const neededMaxCol = Math.max(mpnColIndex, qtyColIndex) + 1;
+    if (neededMaxCol > lastCol) return { ok: false, error: `Selected column index exceeds sheet columns. maxCol=${lastCol}` };
+
+    const numRows = lastRow - dataStartRowIndex;
+    const rows = inSh.getRange(startRow1, 1, numRows, neededMaxCol).getValues();
+
+    const warnings = [];
+
+    function toMpnStr(v) {
+      if (v === null || v === undefined) return "";
+      return String(v).trim();
+    }
+
+    function toQtyValue(v) {
+      if (v === null || v === undefined || v === "") return "";
+      if (typeof v === "number") return v;
+      const s = String(v).trim();
+      if (!s) return "";
+      const n = Number(s.replace(/,/g, ""));
+      if (isFinite(n)) return n;
+      return s; // If not numeric, keep original string
+    }
+
+    const mpnMap = new Map();
+    const outRows = [];
+
+    for (let i = 0; i < rows.length; i++) {
+      const row = rows[i];
+      const mpn = toMpnStr(row[mpnColIndex]);
+      if (!mpn) continue;
+
+      const qtyVal = toQtyValue(row[qtyColIndex]);
+      if (qtyVal === "") warnings.push(`Row ${startRow1 + i}: quantity blank for MPN "${mpn}"`);
+      if (typeof qtyVal === "string" && qtyVal !== "") warnings.push(`Row ${startRow1 + i}: quantity not numeric ("${qtyVal}") for MPN "${mpn}"`);
+
+      if (aggregateSameMpn) {
+        const prev = mpnMap.get(mpn);
+        if (prev === undefined) {
+          mpnMap.set(mpn, qtyVal);
+        } else {
+          if (typeof prev === "number" && typeof qtyVal === "number") {
+            mpnMap.set(mpn, prev + qtyVal);
+          } else {
+            warnings.push(`MPN "${mpn}" duplicated but quantity is not clean numeric; kept first value.`);
+          }
+        }
+      } else {
+        const out = new Array(MOUSER_HEADERS.length).fill("");
+        out[0] = mpn;
+        out[5] = qtyVal;
+        outRows.push(out);
+      }
+    }
+
+    if (aggregateSameMpn) {
+      for (const [mpn, qtyVal] of mpnMap.entries()) {
+        const out = new Array(MOUSER_HEADERS.length).fill("");
+        out[0] = mpn;
+        out[5] = qtyVal;
+        outRows.push(out);
+      }
+    }
+
+    if (outRows.length === 0) return { ok: false, error: "No valid rows found (MPN column had no data)." };
+
+    // Create output Google Sheets
+    const outSS = SpreadsheetApp.create(
+      `Mouser_BOM_${Utilities.formatDate(new Date(), Session.getScriptTimeZone(), "yyyyMMdd_HHmmss")}`
+    );
+    const sheet1 = outSS.getSheets()[0];
+    sheet1.setName("Sheet1");
+
+    sheet1.getRange(1, 1, 1, MOUSER_HEADERS.length).setValues([MOUSER_HEADERS]);
+    sheet1.getRange(2, 1, outRows.length, MOUSER_HEADERS.length).setValues(outRows);
+
+    outSS.insertSheet("Sheet2");
+    outSS.insertSheet("Sheet3");
+
+    // Export via UrlFetchApp
+    const exp = exportGoogleFileAsXlsxBlob_(outSS.getId(), "mouser_bom.xlsx");
+    if (!exp.ok) return { ok: false, error: exp.error };
+
+    const b64 = Utilities.base64Encode(exp.blob.getBytes());
+    const dataUrl = `data:${exp.mimeType};base64,${b64}`;
+
+    return {
+      ok: true,
+      warnings,
+      download: {
+        filename: "mouser_bom.xlsx",
+        mimeType: exp.mimeType,
+        dataUrl
+      }
+    };
+
+  } catch (err) {
+    return { ok: false, error: String(err) };
+  }
+}
