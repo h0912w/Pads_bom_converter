@@ -1,135 +1,91 @@
-<!--VERSION: 010-->
+<!--VERSION: 016-->
 
-<section id="eda-bom-converter" style="border-radius: 14px; border: 1px solid rgb(229, 231, 235); font-family: system-ui, -apple-system, &quot;Segoe UI&quot;, Roboto, Arial, sans-serif; margin: 20px auto; max-width: 1040px; padding: 20px;">
+<section id="eda-bom-converter" style="border-radius:14px;border:1px solid #e5e7eb;font-family:system-ui,-apple-system,&quot;Segoe UI&quot;,Roboto,Arial,sans-serif;margin:20px auto;max-width:1040px;padding:20px;">
 
-  <h1 style="margin: 0px 0px 8px;">EDA BOM Converter for digikey and Mouser (OrCAD, Altium, KiCad, PADS)</h1>
+  <h1 style="margin:0 0 8px;">EDA BOM Converter for digikey and Mouser (OrCAD, Altium, KiCad, PADS)</h1>
 
-  <p style="color: #374151; line-height: 1.6; margin: 0px 0px 12px;">
+  <p style="color:#374151;line-height:1.6;margin:0 0 12px;">
     Convert BOM files exported from <strong>OrCAD, Altium, KiCad, and PADS</strong> into distributor upload-ready formats.
     This converter is <strong>EDA-agnostic</strong>: you do <strong>not</strong> need to select which EDA tool generated the BOM.
-    Upload any BOM and map <strong>MPN</strong> and <strong>Quantity</strong> by clicking cells in the preview table.
+    Upload any BOM, select the <strong>header row</strong>, optionally adjust <strong>MPN / Quantity</strong> using dropdowns, then download
+    <strong>Mouser</strong> or <strong>Digi-Key</strong> BOM templates.
   </p>
 
-  <div style="background: rgb(249, 250, 251); border-radius: 12px; border: 1px solid rgb(229, 231, 235); margin: 12px 0px; padding: 12px;">
-    <p style="color: #111827; line-height: 1.6; margin: 0px;">
-      <strong>Status:</strong> Active (MVP). Current supported outputs:
-      <strong>Mouser BOM upload template (.xlsx)</strong> and <strong>Digi-Key BOM template (.xlsx)</strong>.
+  <div style="background:#f9fafb;border-radius:12px;border:1px solid #e5e7eb;margin:12px 0;padding:12px;">
+    <p style="color:#111827;line-height:1.6;margin:0;">
+      <strong>Status:</strong> Active (MVP). Outputs:
+      <strong>Mouser BOM template (.xlsx)</strong> + <strong>Digi-Key BOM template (.xlsx)</strong>.
     </p>
-    <p style="color: #6b7280; font-size: 13px; line-height: 1.6; margin: 6px 0px 0px;">
+    <p style="color:#6b7280;font-size:13px;line-height:1.6;margin:6px 0 0;">
       Note: This tool runs on Google Apps Script. A Google permission screen may appear on first use.
     </p>
   </div>
 
-  <hr style="border-bottom: 0px; border-image: initial; border-left: 0px; border-right: 0px; border-top: 1px solid rgb(229, 231, 235); border: 0px; margin: 18px 0px;" />
+  <hr style="border:0;border-top:1px solid #e5e7eb;margin:18px 0;" />
 
-  <h2 style="margin: 0px 0px 10px;">What this BOM converter does</h2>
-  <ul style="color: #374151; line-height: 1.7; margin: 0px 0px 14px 18px;">
-    <li><strong>Accepts many BOM formats</strong> (CSV/TXT/TSV/XLS/XLSX) from different EDA tools.</li>
-    <li>Shows a <strong>preview table</strong> so you can verify the BOM before conversion.</li>
-    <li>Lets you map fields by clicking: <strong>one MPN cell</strong> + <strong>one Quantity cell</strong>.</li>
-    <li>Generates <strong>Mouser .xlsx</strong> and <strong>Digi-Key .xlsx</strong> outputs.</li>
-  </ul>
-
-  <div style="background: rgb(255, 255, 255); border-radius: 12px; border: 1px solid rgb(229, 231, 235); margin: 12px 0px; padding: 12px;">
-    <p style="color: #111827; line-height: 1.6; margin: 0px;">
-      <strong>No EDA selection needed:</strong> BOM headers vary widely (e.g., “MPN”, “Part Number”, “Mfr P/N”, “Manufacturer Part Number”, “Qty”, “Quantity”, etc.).
-      This tool avoids per-EDA templates by using <strong>interactive mapping</strong> from the preview table.
-    </p>
-    <p style="color: #6b7280; font-size: 13px; line-height: 1.6; margin: 8px 0px 0px;">
-      Digi-Key output uses header row 2 with exact column names:
-      <strong>Manufacturer Product Number</strong>, <strong>Quantity</strong>.
-    </p>
-  </div>
-
-  <hr style="border-bottom: 0px; border-image: initial; border-left: 0px; border-right: 0px; border-top: 1px solid rgb(229, 231, 235); border: 0px; margin: 18px 0px;" />
-
-  <h2 style="margin: 18px 0px 10px;">How to use (step-by-step)</h2>
-  <ol style="color: #374151; line-height: 1.7; margin: 0px 0px 14px 18px;">
-    <li>Upload your BOM file (CSV/TXT/TSV/XLS/XLSX).</li>
-    <li>Check the preview table (the tool highlights likely header rows).</li>
-    <li>Click <strong>one MPN</strong> cell (Manufacturer Part Number / Part Number / Mfr P/N).</li>
-    <li>Click <strong>one Quantity</strong> cell (QTY / Quantity).</li>
-    <li>Click <strong>Convert</strong> to download <strong>Mouser .xlsx</strong> or <strong>Digi-Key .xlsx</strong>.</li>
+  <h2 style="margin:0 0 10px;">How it works</h2>
+  <ol style="color:#374151;line-height:1.7;margin:0 0 14px 18px;">
+    <li>Upload your BOM file (<strong>.csv .txt .tsv .xls .xlsx</strong>).</li>
+    <li>Check the preview and click the <strong>header row</strong> (clicking any cell selects the entire row).</li>
+    <li>The tool auto-detects <strong>MPN</strong> and <strong>Quantity</strong> columns from the header text (you can override via dropdowns).</li>
+    <li>Download either <strong>Mouser .xlsx</strong> or <strong>Digi-Key .xlsx</strong>.</li>
   </ol>
 
-  <p style="color: #6b7280; font-size: 13px; line-height: 1.6; margin: 0px 0px 14px;">
-    Tip: If your BOM includes duplicate MPN rows, enable <strong>Aggregate quantities</strong> to sum quantities by MPN.
-  </p>
-
-  <hr style="border-bottom: 0px; border-image: initial; border-left: 0px; border-right: 0px; border-top: 1px solid rgb(229, 231, 235); border: 0px; margin: 18px 0px;" />
-
-  <h2 style="margin: 18px 0px 10px;">BOM Upload &amp; Convert Tool</h2>
-
-  <div style="background: rgb(255, 255, 255); border-radius: 14px; border: 1px solid rgb(229, 231, 235); overflow: hidden;">
-    <iframe id="edaBomIframe" loading="lazy" referrerpolicy="no-referrer-when-downgrade" src="https://script.google.com/macros/s/AKfycbxjIK0n3VX6b3T2c7RVKbmBd87e8JXTMywrrs1LOVDhuSDRqmotb6Uk7kdPpkasNcx7wg/exec" style="border: 0; display: block; height: 920px; width: 100%;" title="EDA BOM Converter (Apps Script Web App)">
-    </iframe>
+  <div style="background:#ffffff;border-radius:12px;border:1px solid #e5e7eb;margin:12px 0;padding:12px;">
+    <p style="color:#111827;line-height:1.6;margin:0;">
+      <strong>Digi-Key output requirement:</strong> Header on <strong>Row 2</strong> (Row 1 blank),
+      Column A header must be exactly <strong>Manufacturer Product Number</strong>, Column B header must be exactly <strong>Quantity</strong>.
+    </p>
   </div>
 
-  <p style="color: #6b7280; font-size: 13px; line-height: 1.6; margin: 10px 0px 0px;">
+  <hr style="border:0;border-top:1px solid #e5e7eb;margin:18px 0;" />
+
+  <h2 style="margin:18px 0 10px;">BOM Upload &amp; Convert Tool</h2>
+
+  <div style="background:#fff;border-radius:14px;border:1px solid #e5e7eb;overflow:hidden;">
+    <iframe
+      id="edaBomIframe"
+      loading="lazy"
+      referrerpolicy="no-referrer-when-downgrade"
+      src="https://script.google.com/macros/s/AKfycbwYklqU9yORDGiEghbFy2HhKfnAlzD70ZPZHP8rZ48dtCnGWMHw-hxL19vuNYE18JTzuA/exec"
+      style="border:0;display:block;height:980px;width:100%;"
+      title="EDA BOM Converter (Apps Script Web App)"></iframe>
+  </div>
+
+  <p style="color:#6b7280;font-size:13px;line-height:1.6;margin:10px 0 0;">
     If the embedded tool does not load, open it directly:
-    <a href="https://script.google.com/macros/s/AKfycbxjIK0n3VX6b3T2c7RVKbmBd87e8JXTMywrrs1LOVDhuSDRqmotb6Uk7kdPpkasNcx7wg/exec" rel="noopener noreferrer" target="_blank">
-      https://script.google.com/macros/s/AKfycbxjIK0n3VX6b3T2c7RVKbmBd87e8JXTMywrrs1LOVDhuSDRqmotb6Uk7kdPpkasNcx7wg/exec
-    </a>
+    <a
+      href="https://script.google.com/macros/s/AKfycbwYklqU9yORDGiEghbFy2HhKfnAlzD70ZPZHP8rZ48dtCnGWMHw-hxL19vuNYE18JTzuA/exec"
+      rel="noopener noreferrer"
+      target="_blank">https://script.google.com/macros/s/AKfycbwYklqU9yORDGiEghbFy2HhKfnAlzD70ZPZHP8rZ48dtCnGWMHw-hxL19vuNYE18JTzuA/exec</a>
   </p>
 
-  <hr style="border-bottom: 0px; border-image: initial; border-left: 0px; border-right: 0px; border-top: 1px solid rgb(229, 231, 235); border: 0px; margin: 18px 0px;" />
+  <hr style="border:0;border-top:1px solid #e5e7eb;margin:18px 0;" />
 
-  <h2 style="margin: 18px 0px 10px;">Distributor pages</h2>
-  <p style="color: #374151; line-height: 1.6; margin: 0px 0px 8px;">
-    After conversion, use the official distributor tools:
+  <h2 style="margin:18px 0 10px;">Distributor pages</h2>
+  <p style="color:#374151;line-height:1.6;margin:0 0 8px;">
+    After conversion, upload your result to the distributor tools:
   </p>
 
-  <div style="display: flex; flex-wrap: wrap; gap: 10px; margin: 10px 0px 4px;">
-    <a href="https://www.digikey.com/en/mylists" rel="noopener noreferrer" style="background: rgb(255, 255, 255); border-radius: 12px; border: 1px solid rgb(229, 231, 235); color: #111827; display: inline-block; padding: 10px 14px; text-decoration: none;" target="_blank">
-      Digi-Key myLists
-    </a>
+  <div style="display:flex;flex-wrap:wrap;gap:10px;margin:10px 0 4px;">
+    <a href="https://www.digikey.com/en/mylists"
+       rel="noopener noreferrer"
+       style="background:#fff;border-radius:12px;border:1px solid #e5e7eb;color:#111827;display:inline-block;padding:10px 14px;text-decoration:none;"
+       target="_blank">Open Digi-Key myLists</a>
 
-    <a href="https://www.mouser.kr/create-bom/" rel="noopener noreferrer" style="background: rgb(255, 255, 255); border-radius: 12px; border: 1px solid rgb(229, 231, 235); color: #111827; display: inline-block; padding: 10px 14px; text-decoration: none;" target="_blank">
-      Mouser Create BOM
-    </a>
+    <a href="https://www.mouser.kr/create-bom/"
+       rel="noopener noreferrer"
+       style="background:#fff;border-radius:12px;border:1px solid #e5e7eb;color:#111827;display:inline-block;padding:10px 14px;text-decoration:none;"
+       target="_blank">Open Mouser Create BOM</a>
   </div>
 
-  <hr style="border-bottom: 0px; border-image: initial; border-left: 0px; border-right: 0px; border-top: 1px solid rgb(229, 231, 235); border: 0px; margin: 18px 0px;" />
+  <hr style="border:0;border-top:1px solid #e5e7eb;margin:18px 0;" />
 
-  <h2 style="margin: 18px 0px 10px;">FAQ</h2>
-
-  <div style="background: rgb(255, 255, 255); border-radius: 14px; border: 1px solid rgb(229, 231, 235); margin: 10px 0px; padding: 12px;">
-    <h3 style="font-size: 16px; margin: 0px 0px 6px;">Do I need to choose OrCAD / Altium / KiCad / PADS?</h3>
-    <p style="color: #374151; line-height: 1.6; margin: 0px;">
-      No. This converter is <strong>EDA-agnostic</strong>. Upload any BOM file and map MPN and Quantity by clicking cells in the preview table.
-    </p>
-  </div>
-
-  <div style="background: rgb(255, 255, 255); border-radius: 14px; border: 1px solid rgb(229, 231, 235); margin: 10px 0px; padding: 12px;">
-    <h3 style="font-size: 16px; margin: 0px 0px 6px;">What input formats are supported?</h3>
-    <p style="color: #374151; line-height: 1.6; margin: 0px;">
-      Common BOM exports such as <strong>.csv, .txt, .tsv, .xls, .xlsx</strong>. If the file can be parsed into a table, you can map MPN/QTY and convert.
-    </p>
-  </div>
-
-  <div style="background: rgb(255, 255, 255); border-radius: 14px; border: 1px solid rgb(229, 231, 235); margin: 10px 0px; padding: 12px;">
-    <h3 style="font-size: 16px; margin: 0px 0px 6px;">What outputs does this tool generate?</h3>
-    <p style="color: #374151; line-height: 1.6; margin: 0px;">
-      <strong>Mouser:</strong> a Mouser BOM upload template (.xlsx).<br />
-      <strong>Digi-Key:</strong> an .xlsx where the header is on row 2 and the first two columns are exactly
-      <strong>Manufacturer Product Number</strong> and <strong>Quantity</strong>.
-    </p>
-  </div>
-
-  <div style="background: rgb(255, 255, 255); border-radius: 14px; border: 1px solid rgb(229, 231, 235); margin: 10px 0px; padding: 12px;">
-    <h3 style="font-size: 16px; margin: 0px 0px 6px;">Is this an official Mouser/Digi-Key tool?</h3>
-    <p style="color: #374151; line-height: 1.6; margin: 0px;">
-      No. This is an independent productivity tool to help format BOMs for upload workflows. Always verify part numbers and quantities before purchase.
-    </p>
-  </div>
-
-  <hr style="border-bottom: 0px; border-image: initial; border-left: 0px; border-right: 0px; border-top: 1px solid rgb(229, 231, 235); border: 0px; margin: 18px 0px;" />
-
-  <h2 style="margin: 18px 0px 10px;">Verification &amp; Disclaimer</h2>
-  <ul style="color: #374151; line-height: 1.7; margin: 0px 0px 10px 18px;">
-    <li>This is a productivity tool for BOM formatting and upload workflow support.</li>
-    <li>Always verify MPNs, quantities, and selected alternatives before purchasing.</li>
-    <li>For best results, ensure your BOM has at least one column for <strong>MPN</strong> and one column for <strong>Quantity</strong>.</li>
+  <h2 style="margin:18px 0 10px;">Notes</h2>
+  <ul style="color:#374151;line-height:1.7;margin:0 0 10px 18px;">
+    <li>This is an independent engineering productivity tool for BOM formatting and upload workflow support.</li>
+    <li>Always verify part numbers (MPN) and quantities before purchase.</li>
+    <li>If your BOM has duplicated MPN rows, enable the “aggregate quantities” option in the tool.</li>
   </ul>
 
 </section>
@@ -143,18 +99,17 @@
       "name": "EDA BOM Converter for digikey and Mouser (OrCAD, Altium, KiCad, PADS)",
       "applicationCategory": "BusinessApplication",
       "operatingSystem": "Web",
-      "description": "EDA-agnostic BOM converter for OrCAD, Altium, KiCad, and PADS exports. Upload a BOM, map MPN and Quantity from a preview table, and generate Mouser and Digi-Key .xlsx outputs.",
+      "description": "EDA-agnostic BOM converter for OrCAD, Altium, KiCad, and PADS exports. Upload a BOM, click the header row, auto-detect and optionally override MPN/Quantity columns via dropdowns, then download Mouser or Digi-Key .xlsx outputs.",
       "offers": { "@type": "Offer", "price": "0", "priceCurrency": "USD" }
     },
     {
       "@type": "HowTo",
       "name": "How to convert an EDA BOM for Mouser or Digi-Key upload",
       "step": [
-        { "@type": "HowToStep", "name": "Upload BOM", "text": "Upload a BOM file (CSV/TXT/TSV/XLS/XLSX)." },
-        { "@type": "HowToStep", "name": "Preview", "text": "Check the preview table and identify the MPN and Quantity columns." },
-        { "@type": "HowToStep", "name": "Map MPN", "text": "Click one cell under the MPN column." },
-        { "@type": "HowToStep", "name": "Map Quantity", "text": "Click one cell under the Quantity (QTY) column." },
-        { "@type": "HowToStep", "name": "Convert", "text": "Click Convert to download either Mouser .xlsx or Digi-Key .xlsx output." }
+        { "@type": "HowToStep", "name": "Upload BOM", "text": "Upload a BOM file (.csv, .txt, .tsv, .xls, .xlsx)." },
+        { "@type": "HowToStep", "name": "Select header row", "text": "In the preview table, click the header row (any cell click selects the whole row)." },
+        { "@type": "HowToStep", "name": "Map columns", "text": "MPN and Quantity are auto-detected from the header text. If needed, override using the dropdowns." },
+        { "@type": "HowToStep", "name": "Convert", "text": "Download either Mouser .xlsx or Digi-Key .xlsx output." }
       ]
     },
     {
@@ -165,23 +120,15 @@
           "name": "Do I need to choose OrCAD / Altium / KiCad / PADS?",
           "acceptedAnswer": {
             "@type": "Answer",
-            "text": "No. This converter is EDA-agnostic. Upload any BOM file and map MPN and Quantity by clicking cells in the preview table."
+            "text": "No. This converter is EDA-agnostic. Upload any BOM and click the header row; the tool will detect columns automatically. You can override MPN/Quantity columns using dropdowns."
           }
         },
         {
           "@type": "Question",
-          "name": "What input formats are supported?",
+          "name": "What Digi-Key format does the output follow?",
           "acceptedAnswer": {
             "@type": "Answer",
-            "text": "Common BOM export formats such as .csv, .txt, .tsv, .xls, and .xlsx."
-          }
-        },
-        {
-          "@type": "Question",
-          "name": "What Digi-Key columns are generated?",
-          "acceptedAnswer": {
-            "@type": "Answer",
-            "text": "The Digi-Key .xlsx output uses header row 2 and the first two columns are exactly: Manufacturer Product Number, Quantity."
+            "text": "The Digi-Key .xlsx output places the header on row 2 (row 1 is blank). Column A header is exactly 'Manufacturer Product Number' and column B header is exactly 'Quantity'."
           }
         }
       ]

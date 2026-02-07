@@ -1,0 +1,625 @@
+<!doctype html>
+<html>
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width,initial-scale=1" />
+  <title>EDA BOM Converter (Mouser / Digi-Key)</title>
+  <style>
+    body{
+      font-family:system-ui,-apple-system,Segoe UI,Roboto,Arial,sans-serif;
+      max-width:1100px;margin:18px auto;padding:0 14px;
+    }
+    .card{border:1px solid #e5e7eb;border-radius:14px;padding:14px;margin:12px 0;background:#fff;}
+    button{padding:10px 14px;border:0;border-radius:12px;background:#111827;color:#fff;cursor:pointer;}
+    button:disabled{opacity:.5;cursor:not-allowed;}
+    pre{background:#f9fafb;border:1px solid #e5e7eb;border-radius:12px;padding:10px;overflow:auto;}
+    .muted{color:#6b7280;font-size:13px;}
+    .row{display:flex;gap:10px;align-items:center;flex-wrap:wrap;}
+    .grid{display:grid;grid-template-columns: 1fr;gap:12px;}
+    .pill{display:inline-block;padding:4px 10px;border:1px solid #e5e7eb;border-radius:999px;font-size:12px;color:#111827;background:#f9fafb;}
+    .warn{color:#b45309;font-size:13px;white-space:pre-wrap;}
+    .ok{color:#065f46;font-size:13px;white-space:pre-wrap;}
+
+    .tableWrap{
+      border:1px solid #e5e7eb;border-radius:14px;overflow:auto;max-height:520px;
+      position:relative;
+    }
+    table{border-collapse:collapse;width:100%;min-width:920px;}
+    th, td{border-bottom:1px solid #f1f5f9;border-right:1px solid #f1f5f9;padding:6px 8px;font-size:13px;white-space:nowrap;}
+    th{position:sticky;top:0;background:#f9fafb;z-index:2;text-align:left;}
+    td{background:#fff;}
+    tr:hover td{background:#fcfcfd;}
+    .rowIndex{position:sticky;left:0;background:#f9fafb;z-index:3;font-weight:600;}
+    .cellIndex{color:#94a3b8;font-size:12px;}
+
+    tr.headerSelected td{background:#e0f2fe !important;}
+    tr.headerSelected td.rowIndex{background:#bae6fd !important;}
+
+    td.clickable{cursor:pointer;}
+
+    .mapBox{border:1px solid #e5e7eb;border-radius:14px;padding:12px;background:#fff;}
+    .small{font-size:12px;color:#6b7280;}
+
+    .note{font-size:12px;color:#6b7280;margin-top:8px;line-height:1.5;}
+    code{background:#f3f4f6;padding:1px 6px;border-radius:6px;}
+
+    select{
+      padding:8px 10px;border:1px solid #e5e7eb;border-radius:10px;background:#fff;
+      font-size:13px;color:#111827;
+    }
+    label{font-size:13px;color:#111827;}
+  </style>
+</head>
+<body>
+  <h1>EDA BOM Converter (Mouser / Digi-Key)</h1>
+  <p class="muted">
+    Upload → Preview → <b>Click header row only</b> → (Auto-detect + Dropdown override) → Convert → Download
+  </p>
+
+  <div class="card">
+    <h2>1) Select file</h2>
+    <input id="file" type="file" accept=".csv,.txt,.tsv,.xls,.xlsx" />
+    <p class="muted" id="fileInfo"></p>
+
+    <div class="row" style="margin-top:10px;">
+      <button id="btnUpload">Upload & Preview</button>
+      <span class="muted" id="status"></span>
+      <span class="pill" id="stagePill">Stage: idle</span>
+    </div>
+  </div>
+
+  <div class="card" id="previewCard" style="display:none;">
+    <h2>2) Preview</h2>
+
+    <div class="row" style="margin:8px 0 12px;">
+      <span class="muted" id="guideText">Guide: Click the <b>header row</b> in the table. (Any cell selects the whole row)</span>
+    </div>
+
+    <div class="grid">
+      <div class="tableWrap" id="tableWrap"></div>
+
+      <div class="mapBox">
+        <div class="small" id="headerPickState">Header row: not selected</div>
+
+        <div class="row" style="margin-top:10px;">
+          <label class="small"><input type="checkbox" id="chkAgg" /> Aggregate same MPN (sum Quantity)</label>
+        </div>
+
+        <hr style="border:0;border-top:1px solid #e5e7eb;margin:14px 0;">
+
+        <div class="small"><b>Column mapping</b></div>
+
+        <div class="row" style="margin-top:10px;">
+          <label for="mpnSelect"><b>MPN column</b></label>
+          <select id="mpnSelect" disabled></select>
+
+          <label for="qtySelect" style="margin-left:8px;"><b>Quantity column</b></label>
+          <select id="qtySelect" disabled></select>
+        </div>
+
+        <div class="small" id="autoMapText" style="margin-top:10px;">-</div>
+
+        <div class="note" style="margin-top:10px;">
+          <b>MPN sample (first 5 rows from data start):</b>
+          If all blank, you can still convert — you’ll be asked to confirm.
+        </div>
+        <pre id="mpnSamples" style="margin-top:10px;">(no samples)</pre>
+
+        <div id="sampleWarn" class="warn" style="margin-top:8px;display:none;"></div>
+        <div id="sampleOk" class="ok" style="margin-top:8px;display:none;"></div>
+
+        <div class="note" style="margin-top:10px;">
+          <b>Digi-Key output:</b> Header on row 2, Column A = <b>Manufacturer Product Number</b>, Column B = <b>Quantity</b>.
+        </div>
+
+        <div class="row" style="margin-top:14px;">
+          <button id="btnConvertMouser" disabled>Convert & Download (Mouser .xlsx)</button>
+          <button id="btnConvertDigikey" disabled>Convert & Download (Digi-Key .xlsx)</button>
+        </div>
+
+        <div class="muted" id="convertStatus" style="margin-top:10px;"></div>
+        <div id="warnings" class="warn" style="margin-top:10px;"></div>
+
+        <div id="downloadArea" style="display:none;margin-top:10px;">
+          <p class="muted" style="margin:0;">If auto-download is blocked, click below.</p>
+          <a id="downloadLink" href="#" download="">Download output.xlsx</a>
+        </div>
+      </div>
+    </div>
+
+    <h3>Server Response (debug)</h3>
+    <pre id="out">{}</pre>
+  </div>
+
+<script>
+  // DOM
+  const fileEl = document.getElementById('file');
+  const fileInfoEl = document.getElementById('fileInfo');
+  const btnUpload = document.getElementById('btnUpload');
+  const statusEl = document.getElementById('status');
+  const stagePill = document.getElementById('stagePill');
+
+  const previewCard = document.getElementById('previewCard');
+  const tableWrap = document.getElementById('tableWrap');
+  const outEl = document.getElementById('out');
+
+  const guideText = document.getElementById('guideText');
+  const headerPickState = document.getElementById('headerPickState');
+
+  const chkAgg = document.getElementById('chkAgg');
+
+  const mpnSelect = document.getElementById('mpnSelect');
+  const qtySelect = document.getElementById('qtySelect');
+  const autoMapText = document.getElementById('autoMapText');
+
+  const mpnSamplesEl = document.getElementById('mpnSamples');
+  const sampleWarn = document.getElementById('sampleWarn');
+  const sampleOk = document.getElementById('sampleOk');
+
+  const btnConvertMouser = document.getElementById('btnConvertMouser');
+  const btnConvertDigikey = document.getElementById('btnConvertDigikey');
+  const convertStatus = document.getElementById('convertStatus');
+  const warningsEl = document.getElementById('warnings');
+  const downloadArea = document.getElementById('downloadArea');
+  const downloadLink = document.getElementById('downloadLink');
+
+  const MAX_BYTES = 8 * 1024 * 1024;
+
+  // State
+  let token = null;
+  let preview = null;
+  let headerRowIndex = null;
+
+  let mpnColIndex = null;
+  let qtyColIndex = null;
+  let effectiveDataStartRowIndex = null;
+
+  let lastMpnSamplesBlank = false;
+
+  function setStage(s){ stagePill.textContent = `Stage: ${s}`; }
+
+  function resetAll() {
+    token = null;
+    preview = null;
+    headerRowIndex = null;
+
+    mpnColIndex = null;
+    qtyColIndex = null;
+    effectiveDataStartRowIndex = null;
+
+    lastMpnSamplesBlank = false;
+
+    tableWrap.innerHTML = '';
+    outEl.textContent = '{}';
+    warningsEl.textContent = '';
+    downloadArea.style.display = 'none';
+    convertStatus.textContent = '';
+
+    headerPickState.textContent = 'Header row: not selected';
+    autoMapText.textContent = '-';
+    mpnSamplesEl.textContent = '(no samples)';
+    sampleWarn.style.display = 'none';
+    sampleOk.style.display = 'none';
+
+    // Convert buttons disabled until header is chosen & dropdowns ready
+    btnConvertMouser.disabled = true;
+    btnConvertDigikey.disabled = true;
+
+    mpnSelect.innerHTML = '';
+    qtySelect.innerHTML = '';
+    mpnSelect.disabled = true;
+    qtySelect.disabled = true;
+
+    guideText.innerHTML = 'Guide: Click the <b>header row</b> in the table. (Any cell selects the whole row)';
+    setStage('idle');
+  }
+
+  fileEl.addEventListener('change', () => {
+    const f = fileEl.files && fileEl.files[0];
+    resetAll();
+    previewCard.style.display = 'none';
+    statusEl.textContent = '';
+    if (!f) { fileInfoEl.textContent = ''; return; }
+    fileInfoEl.textContent = `Selected: ${f.name} (${f.type || 'unknown'}) / ${f.size} bytes`;
+    if (f.size > MAX_BYTES) statusEl.textContent = `File too large (limit ${MAX_BYTES} bytes).`;
+  });
+
+  function escapeHtml(s) {
+    return String(s)
+      .replace(/&/g,'&amp;')
+      .replace(/</g,'&lt;')
+      .replace(/>/g,'&gt;')
+      .replace(/"/g,'&quot;')
+      .replace(/'/g,'&#39;');
+  }
+
+  function renderTable(values) {
+    const rowCount = values.length;
+    const colCount = values[0] ? values[0].length : 0;
+
+    let html = '<table><thead><tr>';
+    html += '<th class="rowIndex">#</th>';
+    for (let c = 0; c < colCount; c++) {
+      html += `<th>Col ${c+1}<div class="cellIndex">${String.fromCharCode(65 + (c % 26))}</div></th>`;
+    }
+    html += '</tr></thead><tbody>';
+
+    for (let r = 0; r < rowCount; r++) {
+      html += `<tr data-r="${r}">`;
+      html += `<td class="rowIndex">${r+1}</td>`;
+      for (let c = 0; c < colCount; c++) {
+        const v = values[r][c];
+        const show = (v === null || v === undefined) ? "" : String(v);
+        html += `<td class="clickable" data-r="${r}" data-c="${c}">${escapeHtml(show)}</td>`;
+      }
+      html += '</tr>';
+    }
+    html += '</tbody></table>';
+
+    tableWrap.innerHTML = html;
+    tableWrap.querySelectorAll('td.clickable').forEach(td => td.addEventListener('click', () => onAnyCellClick(td)));
+  }
+
+  function markSelectedHeaderRow(r) {
+    tableWrap.querySelectorAll('tr.headerSelected').forEach(tr => tr.classList.remove('headerSelected'));
+    const tr = tableWrap.querySelector(`tr[data-r="${r}"]`);
+    if (tr) tr.classList.add('headerSelected');
+  }
+
+  function inferColsFromHeaderRow(headerRow) {
+    const cells = (headerRow || []).map(v => (v===null||v===undefined) ? "" : String(v).trim());
+    const lower = cells.map(s => s.toLowerCase());
+
+    const mpnPatterns = [
+      /\bmpn\b/,
+      /\bmanufacturer\s*part\s*number\b/,
+      /\bmfr\s*part\s*number\b/,
+      /\bmanuf(acter|)\s*p\/n\b/,
+      /\bpart\s*number\b/,
+      /\bp\/n\b/,
+      /\bpn\b/
+    ];
+    const qtyPatterns = [
+      /\bqty\b/,
+      /\bquantity\b/,
+      /\border\s*qty\b/,
+      /\bqty\./
+    ];
+
+    function find(patterns){
+      for (let i=0;i<lower.length;i++){
+        if (!lower[i]) continue;
+        for (const rx of patterns){
+          if (rx.test(lower[i])) return i;
+        }
+      }
+      return null;
+    }
+
+    let mpn = find(mpnPatterns);
+    let qty = find(qtyPatterns);
+
+    if (mpn === null) {
+      for (let i=0;i<lower.length;i++){
+        if (/\bpart\b/.test(lower[i])) { mpn = i; break; }
+      }
+    }
+    if (qty === null) {
+      for (let i=0;i<lower.length;i++){
+        if (lower[i] === 'q' || lower[i] === 'qty') { qty = i; break; }
+      }
+    }
+
+    return { mpnColIndex: mpn, qtyColIndex: qty, headerCells: cells };
+  }
+
+  function inferEffectiveDataStart(values, headerIdx, mpnC, qtyC){
+    for (let r = headerIdx + 1; r < values.length; r++){
+      const mpn = (values[r][mpnC]===null||values[r][mpnC]===undefined) ? "" : String(values[r][mpnC]).trim();
+      const qty = (values[r][qtyC]===null||values[r][qtyC]===undefined) ? "" : String(values[r][qtyC]).trim();
+      if (mpn === "" && qty === "") continue;
+      return r;
+    }
+    return headerIdx + 1;
+  }
+
+  function buildMpnSamples(values, startRow, mpnC, count){
+    const lines = [];
+    for (let i=0;i<count;i++){
+      const r = startRow + i;
+      if (r >= values.length) break;
+      const v = (values[r][mpnC]===null||values[r][mpnC]===undefined) ? "" : String(values[r][mpnC]).trim();
+      lines.push(`Row ${r+1}: ${v}`);
+    }
+    return lines;
+  }
+
+  function isAllBlankSamples(lines){
+    if (!lines.length) return true;
+    return lines.every(line => {
+      const idx = line.indexOf(':');
+      const v = (idx>=0) ? line.slice(idx+1).trim() : line.trim();
+      return v === '';
+    });
+  }
+
+  function fillDropdowns(colCount, headerCells){
+    mpnSelect.innerHTML = '';
+    qtySelect.innerHTML = '';
+
+    for (let c=0;c<colCount;c++){
+      const label = headerCells && headerCells[c] ? headerCells[c] : '';
+      const text = `Col ${c+1}${label ? ' - ' + label : ''}`;
+
+      const o1 = document.createElement('option');
+      o1.value = String(c);
+      o1.textContent = text;
+      mpnSelect.appendChild(o1);
+
+      const o2 = document.createElement('option');
+      o2.value = String(c);
+      o2.textContent = text;
+      qtySelect.appendChild(o2);
+    }
+
+    mpnSelect.disabled = false;
+    qtySelect.disabled = false;
+  }
+
+  function refreshMappingAndSamples(){
+    if (!preview || !preview.values) return;
+    if (headerRowIndex === null) return;
+    if (mpnColIndex === null || qtyColIndex === null) return;
+
+    const values = preview.values;
+
+    effectiveDataStartRowIndex = inferEffectiveDataStart(values, headerRowIndex, mpnColIndex, qtyColIndex);
+
+    const headerRow = values[headerRowIndex] || [];
+    const headerCells = headerRow.map(v => (v===null||v===undefined) ? "" : String(v).trim());
+    const mpnHeader = headerCells[mpnColIndex] || '(blank)';
+    const qtyHeader = headerCells[qtyColIndex] || '(blank)';
+
+    autoMapText.innerHTML =
+      `MPN: <code>col ${mpnColIndex+1}</code> (${escapeHtml(mpnHeader)}) / ` +
+      `QTY: <code>col ${qtyColIndex+1}</code> (${escapeHtml(qtyHeader)}) / ` +
+      `Data starts at <code>row ${effectiveDataStartRowIndex+1}</code>`;
+
+    const samples = buildMpnSamples(values, effectiveDataStartRowIndex, mpnColIndex, 5);
+    mpnSamplesEl.textContent = samples.join('\n');
+
+    const blank = isAllBlankSamples(samples);
+    lastMpnSamplesBlank = blank;
+
+    // ✅ Convert 비활성화는 하지 않음. 대신 경고 문구만 표시.
+    if (blank) {
+      sampleWarn.style.display = 'block';
+      sampleWarn.textContent =
+        'Warning: First 5 MPN samples are blank. Data might start later (e.g., from 6th row). You can still convert, but you will be asked to confirm.';
+      sampleOk.style.display = 'none';
+    } else {
+      sampleWarn.style.display = 'none';
+      sampleOk.style.display = 'block';
+      sampleOk.textContent = 'MPN samples detected. You can convert.';
+    }
+
+    // ✅ 헤더 선택만 되면 Convert 버튼은 활성
+    btnConvertMouser.disabled = false;
+    btnConvertDigikey.disabled = false;
+
+    setStage('ready');
+  }
+
+  function onAnyCellClick(td) {
+    if (!preview || !preview.values) return;
+
+    const r = Number(td.getAttribute('data-r'));
+    headerRowIndex = r;
+
+    markSelectedHeaderRow(r);
+    headerPickState.textContent = `Header row: ${headerRowIndex+1}`;
+
+    const headerRow = preview.values[headerRowIndex] || [];
+    const det = inferColsFromHeaderRow(headerRow);
+
+    const colCount = (preview.values[0] ? preview.values[0].length : 0);
+    const headerCells = headerRow.map(v => (v===null||v===undefined) ? "" : String(v).trim());
+    fillDropdowns(colCount, headerCells);
+
+    if (det.mpnColIndex === null || det.qtyColIndex === null) {
+      mpnColIndex = 0;
+      qtyColIndex = Math.min(1, colCount-1);
+
+      mpnSelect.value = String(mpnColIndex);
+      qtySelect.value = String(qtyColIndex);
+
+      guideText.innerHTML = 'Guide: Header row selected ✅ Auto-detect failed → please set MPN/QTY via dropdown.';
+      refreshMappingAndSamples();
+      return;
+    }
+
+    mpnColIndex = det.mpnColIndex;
+    qtyColIndex = det.qtyColIndex;
+
+    mpnSelect.value = String(mpnColIndex);
+    qtySelect.value = String(qtyColIndex);
+
+    guideText.innerHTML = 'Guide: Header row selected ✅ Auto-detected mapping is applied. You can override via dropdown.';
+    refreshMappingAndSamples();
+  }
+
+  mpnSelect.addEventListener('change', () => {
+    mpnColIndex = Number(mpnSelect.value);
+    refreshMappingAndSamples();
+  });
+  qtySelect.addEventListener('change', () => {
+    qtyColIndex = Number(qtySelect.value);
+    refreshMappingAndSamples();
+  });
+
+  // Upload
+  btnUpload.addEventListener('click', async () => {
+    const f = fileEl.files && fileEl.files[0];
+    if (!f) { alert('Please select a file first.'); return; }
+    if (f.size > MAX_BYTES) { alert('File is too large (8MB limit).'); return; }
+
+    resetAll();
+    previewCard.style.display = 'block';
+    btnUpload.disabled = true;
+    statusEl.textContent = 'Reading file...';
+    setStage('reading');
+
+    try {
+      const dataUrl = await new Promise((resolve, reject) => {
+        const reader = new FileReader();
+        reader.onload = () => resolve(reader.result);
+        reader.onerror = () => reject(reader.error);
+        reader.readAsDataURL(f);
+      });
+
+      statusEl.textContent = 'Uploading & building preview...';
+      setStage('uploading');
+
+      google.script.run
+        .withSuccessHandler((res) => {
+          outEl.textContent = JSON.stringify(res, null, 2);
+
+          if (res && res.ok && res.preview && res.preview.values) {
+            token = res.token;
+            preview = res.preview;
+
+            renderTable(preview.values);
+
+            statusEl.textContent = 'Preview ready ✅';
+            guideText.innerHTML = 'Guide: Click the <b>header row</b> in the table. (Any cell selects the whole row)';
+            setStage('preview');
+          } else {
+            statusEl.textContent = 'Failed ❌ (no preview)';
+            setStage('error');
+          }
+
+          btnUpload.disabled = false;
+        })
+        .withFailureHandler((err) => {
+          outEl.textContent = String(err);
+          statusEl.textContent = 'Failed ❌ (script error)';
+          setStage('error');
+          btnUpload.disabled = false;
+        })
+        .uploadAndGetPreview({ filename: f.name, mimeType: f.type || '', dataUrl });
+    } catch (e) {
+      outEl.textContent = String(e);
+      statusEl.textContent = 'Failed ❌ (file read error)';
+      setStage('error');
+      btnUpload.disabled = false;
+    }
+  });
+
+  function triggerDownload(dataUrl, filename) {
+    const a = document.createElement('a');
+    a.href = dataUrl;
+    a.download = filename || 'output.xlsx';
+    document.body.appendChild(a);
+    a.click();
+    a.remove();
+  }
+
+  function buildReq() {
+    if (headerRowIndex === null) return null;
+    return {
+      token,
+      mapping: {
+        headerRowIndex,
+        aggregateSameMpn: chkAgg.checked
+      }
+    };
+  }
+
+  function prepareConvertUI() {
+    btnConvertMouser.disabled = true;
+    btnConvertDigikey.disabled = true;
+    convertStatus.textContent = 'Converting...';
+    warningsEl.textContent = '';
+    downloadArea.style.display = 'none';
+    setStage('converting');
+  }
+
+  function finishConvertUI(res) {
+    outEl.textContent = JSON.stringify(res, null, 2);
+
+    if (res && res.ok && res.download && res.download.dataUrl) {
+      if (res.warnings && res.warnings.length) {
+        warningsEl.textContent = "Warnings:\n- " + res.warnings.join("\n- ");
+      } else {
+        warningsEl.textContent = "";
+      }
+
+      downloadLink.href = res.download.dataUrl;
+      downloadLink.download = res.download.filename || 'output.xlsx';
+      downloadLink.textContent = `Download ${downloadLink.download}`;
+      downloadArea.style.display = 'block';
+
+      try {
+        triggerDownload(res.download.dataUrl, downloadLink.download);
+        convertStatus.textContent = `Done ✅ (download triggered)`;
+      } catch (e) {
+        convertStatus.textContent = 'Done ✅ (auto-download blocked; use link below)';
+      }
+
+      setStage('done');
+    } else {
+      convertStatus.textContent = 'Failed ❌ (no download data)';
+      setStage('error');
+    }
+
+    // 헤더 선택 상태면 다시 활성
+    btnConvertMouser.disabled = (headerRowIndex === null);
+    btnConvertDigikey.disabled = (headerRowIndex === null);
+  }
+
+  function failConvertUI(err) {
+    outEl.textContent = String(err);
+    convertStatus.textContent = 'Failed ❌ (script error)';
+    setStage('error');
+
+    btnConvertMouser.disabled = (headerRowIndex === null);
+    btnConvertDigikey.disabled = (headerRowIndex === null);
+  }
+
+  function confirmIfSamplesBlank(){
+    if (!lastMpnSamplesBlank) return true;
+    return confirm(
+      "MPN sample 5 rows are all blank.\n" +
+      "Data might start later (e.g., from 6th row).\n\n" +
+      "Do you want to continue conversion?"
+    );
+  }
+
+  btnConvertMouser.addEventListener('click', () => {
+    if (!token || !token.sheetId) { alert('Please upload first.'); return; }
+    if (headerRowIndex === null) { alert('Please select a header row first.'); return; }
+    if (!confirmIfSamplesBlank()) return;
+
+    prepareConvertUI();
+    google.script.run
+      .withSuccessHandler((res) => finishConvertUI(res))
+      .withFailureHandler((err) => failConvertUI(err))
+      .convertToMouserTemplate(buildReq());
+  });
+
+  btnConvertDigikey.addEventListener('click', () => {
+    if (!token || !token.sheetId) { alert('Please upload first.'); return; }
+    if (headerRowIndex === null) { alert('Please select a header row first.'); return; }
+    if (!confirmIfSamplesBlank()) return;
+
+    prepareConvertUI();
+    google.script.run
+      .withSuccessHandler((res) => finishConvertUI(res))
+      .withFailureHandler((err) => failConvertUI(err))
+      .convertToDigiKeyTemplate(buildReq());
+  });
+
+  resetAll();
+</script>
+</body>
+</html>

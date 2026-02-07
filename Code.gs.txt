@@ -1,26 +1,37 @@
 /**
- * [Improvements Summary (User-facing)]
- * 1) After upload, a preview table is shown and the UI auto-jumps to likely header rows (highlight + scroll).
- * 2) Mapping is done by clicking one MPN cell and one QTY cell in the table.
- * 3) Clicking Convert generates a Mouser BOM template (.xlsx) and downloads it immediately.
- * 4) (Important fix) Some environments can throw an exception like:
- *    "HTTP 200 + PK..." when using Advanced Drive Service export (alt=media).
- *    So export is implemented via UrlFetchApp instead of Drive.Files.export.
+ * EDA BOM Converter Web App (Mouser + Digi-Key)
+ * - Upload & Preview
+ * - Header row selection (frontend)
+ * - Column mapping:
+ *    - If mapping.mpnColIndex / mapping.qtyColIndex provided => use them (dropdown override)
+ *    - Else => auto-detect from header row text (fallback)
+ * - Data start row:
+ *    - If mapping.dataStartRowIndex provided => use it
+ *    - Else => auto-adjust scanning downward to first row that has MPN or QTY (skip blank rows)
  *
- * [Notes]
- * - Requires Advanced Google Drive Service (Drive API v3) enabled. (Drive.Files.copy)
- * - Export uses UrlFetchApp, so it requires the script.external_request OAuth scope.
- * - After code changes, redeploy:
- *   Deploy → Manage deployments → Edit → New version → Deploy
- *   to apply changes to /exec.
+ * Digi-Key output requirement:
+ *  - Row 1 blank
+ *  - Header on Row 2
+ *  - Column A header: "Manufacturer Product Number"
+ *  - Column B header: "Quantity"
+ *
+ * Export fix:
+ * - SpreadsheetApp.flush() + Utilities.sleep() before Drive export
+ *
+ * Requirements:
+ * - Advanced Drive Service v3 enabled (Drive.Files.copy)
+ * - OAuth scopes: drive, spreadsheets, script.external_request
  */
 
 function doGet() {
-  return HtmlService.createHtmlOutputFromFile('Index')
-    .setTitle('BOM → Mouser Template Converter')
+  return HtmlService.createHtmlOutputFromFile("Index")
+    .setTitle("EDA BOM Converter (Mouser / Digi-Key)")
     .setXFrameOptionsMode(HtmlService.XFrameOptionsMode.ALLOWALL);
 }
 
+const MAX_BYTES = 8 * 1024 * 1024; // 8MB
+
+// Mouser template headers
 const MOUSER_HEADERS = [
   "Mfr Part Number (Input)",
   "Manufacturer Part Number",
@@ -52,8 +63,13 @@ const MOUSER_HEADERS = [
   "Design Risk"
 ];
 
-const MAX_BYTES = 8 * 1024 * 1024; // 8MB
+// Digi-Key headers (MUST match exactly)
+const DIGIKEY_HEADERS = ["Manufacturer Product Number", "Quantity"];
 
+/**
+ * Upload file as base64 dataURL, store temporarily, convert to Google Sheets,
+ * return a preview matrix to the frontend.
+ */
 function uploadAndGetPreview(payload) {
   try {
     if (!payload || !payload.dataUrl) return { ok: false, error: "No file data received." };
@@ -75,18 +91,18 @@ function uploadAndGetPreview(payload) {
       return { ok: false, error: `File too large: ${sizeBytes} bytes (limit: ${MAX_BYTES} bytes).` };
     }
 
-    // 1) Save the uploaded file temporarily
+    // 1) Save original file temporarily
     const blob = Utilities.newBlob(bytes, mimeType, filename);
     const srcFile = DriveApp.createFile(blob);
 
-    // 2) Convert to Google Sheets (Drive API v3 Advanced Service)
+    // 2) Convert to Google Sheets (Advanced Drive Service v3)
     const converted = Drive.Files.copy(
       { title: filename, mimeType: MimeType.GOOGLE_SHEETS },
       srcFile.getId()
     );
     const sheetId = converted.id;
 
-    // 3) Read preview (top portion only)
+    // 3) Read preview
     const ss = SpreadsheetApp.openById(sheetId);
     const sh = ss.getSheets()[0];
 
@@ -112,8 +128,7 @@ function uploadAndGetPreview(payload) {
 }
 
 /**
- * Key point: Export Google files via UrlFetchApp instead of Advanced Drive export
- * to avoid some "HTTP 200 + PK..." exception cases.
+ * Export Google Sheets file as XLSX Blob via Drive API v3 export endpoint.
  */
 function exportGoogleFileAsXlsxBlob_(fileId, filenameForBlob) {
   const exportMime = "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet";
@@ -136,102 +151,241 @@ function exportGoogleFileAsXlsxBlob_(fileId, filenameForBlob) {
     return { ok: false, error: "Drive export failed. HTTP " + code + " / " + res.getContentText() };
   }
 
-  const blob = res.getBlob().setName(filenameForBlob || "mouser_bom.xlsx");
+  const blob = res.getBlob().setName(filenameForBlob || "output.xlsx");
   return { ok: true, blob, mimeType: exportMime };
 }
 
+/** ===== Helpers ===== */
+
+function toStr_(v) {
+  if (v === null || v === undefined) return "";
+  return String(v).trim();
+}
+
+function toQty_(v) {
+  if (v === null || v === undefined || v === "") return "";
+  if (typeof v === "number") return v;
+  const s = String(v).trim();
+  if (!s) return "";
+  const n = Number(s.replace(/,/g, ""));
+  if (isFinite(n)) return n;
+  return s; // keep original if not numeric
+}
+
+/**
+ * Auto-detect MPN/QTY columns from header row text.
+ * Returns { mpnColIndex, qtyColIndex } or nulls when not found.
+ */
+function detectColsFromHeaderRow_(headerRow) {
+  const cells = (headerRow || []).map(toStr_);
+  const lower = cells.map(s => s.toLowerCase());
+
+  const mpnPatterns = [
+    /\bmpn\b/,
+    /\bmanufacturer\s*part\s*number\b/,
+    /\bmfr\s*part\s*number\b/,
+    /\bpart\s*number\b/,
+    /\bp\/n\b/,
+    /\bpn\b/
+  ];
+
+  const qtyPatterns = [
+    /\bqty\b/,
+    /\bquantity\b/,
+    /\border\s*qty\b/
+  ];
+
+  function findIdx(patterns) {
+    for (let i = 0; i < lower.length; i++) {
+      const t = lower[i];
+      if (!t) continue;
+      for (const rx of patterns) {
+        if (rx.test(t)) return i;
+      }
+    }
+    return null;
+  }
+
+  let mpn = findIdx(mpnPatterns);
+  let qty = findIdx(qtyPatterns);
+
+  // soft fallback
+  if (mpn === null) {
+    for (let i = 0; i < lower.length; i++) {
+      if (/\bpart\b/.test(lower[i])) { mpn = i; break; }
+    }
+  }
+
+  return { mpnColIndex: mpn, qtyColIndex: qty };
+}
+
+/**
+ * Determine effective data start row index (0-based).
+ * - If mapping.dataStartRowIndex provided: use it (validated)
+ * - Else: scan from headerRowIndex+1 downward; first row where (mpn OR qty) not blank
+ * If none found, returns headerRowIndex+1.
+ */
+function inferDataStartRowIndex_(values2d, headerRowIndex, mpnColIndex, qtyColIndex) {
+  const start = headerRowIndex + 1;
+  for (let r = start; r < values2d.length; r++) {
+    const mpn = toStr_(values2d[r][mpnColIndex]);
+    const qty = toStr_(values2d[r][qtyColIndex]);
+    if (mpn === "" && qty === "") continue;
+    return r;
+  }
+  return start;
+}
+
+/**
+ * Shared: read source rows using mapping
+ * mapping:
+ * - headerRowIndex (required, 0-based)
+ * - mpnColIndex / qtyColIndex (optional, 0-based, dropdown override)
+ * - dataStartRowIndex (optional, 0-based)
+ * - aggregateSameMpn (optional)
+ */
+function readMappedRows_(sheetId, mapping) {
+  const headerRowIndex = Number(mapping.headerRowIndex);
+  if (!isFinite(headerRowIndex) || headerRowIndex < 0) throw new Error("Invalid headerRowIndex");
+
+  const aggregateSameMpn = !!mapping.aggregateSameMpn;
+
+  // Dropdown override (optional)
+  const providedMpn = (mapping.mpnColIndex !== undefined && mapping.mpnColIndex !== null) ? Number(mapping.mpnColIndex) : null;
+  const providedQty = (mapping.qtyColIndex !== undefined && mapping.qtyColIndex !== null) ? Number(mapping.qtyColIndex) : null;
+
+  // Optional dataStartRowIndex
+  const providedDataStart = (mapping.dataStartRowIndex !== undefined && mapping.dataStartRowIndex !== null) ? Number(mapping.dataStartRowIndex) : null;
+
+  const inSS = SpreadsheetApp.openById(String(sheetId));
+  const inSh = inSS.getSheets()[0];
+
+  const lastRow = inSh.getLastRow();
+  const lastCol = inSh.getLastColumn();
+  if (lastRow < 1 || lastCol < 1) throw new Error("No data in source sheet.");
+
+  const headerRow1 = headerRowIndex + 1;
+  if (headerRow1 > lastRow) throw new Error("Header row is beyond last row.");
+
+  // Read full preview-like area needed for mapping & scanning
+  // We only need up to lastCol and down to lastRow.
+  const allValues = inSh.getRange(1, 1, lastRow, lastCol).getValues();
+
+  // Resolve mpn/qty columns
+  let mpnColIndex = null;
+  let qtyColIndex = null;
+
+  if (providedMpn !== null && isFinite(providedMpn) && providedMpn >= 0) mpnColIndex = providedMpn;
+  if (providedQty !== null && isFinite(providedQty) && providedQty >= 0) qtyColIndex = providedQty;
+
+  // If not provided, auto-detect from header row
+  if (mpnColIndex === null || qtyColIndex === null) {
+    const headerRow = allValues[headerRowIndex] || [];
+    const det = detectColsFromHeaderRow_(headerRow);
+
+    if (mpnColIndex === null) mpnColIndex = det.mpnColIndex;
+    if (qtyColIndex === null) qtyColIndex = det.qtyColIndex;
+  }
+
+  // Still not found -> force user to pick via dropdown
+  if (mpnColIndex === null || qtyColIndex === null) {
+    throw new Error("Could not detect MPN/QTY columns. Please select them using the dropdown.");
+  }
+
+  // Validate column indices within sheet
+  if (mpnColIndex + 1 > lastCol || qtyColIndex + 1 > lastCol) {
+    throw new Error(`Selected column index exceeds sheet columns. lastCol=${lastCol}`);
+  }
+
+  // Data start row index (0-based)
+  let dataStartRowIndex = null;
+  if (providedDataStart !== null && isFinite(providedDataStart) && providedDataStart >= 0) {
+    dataStartRowIndex = providedDataStart;
+  } else {
+    dataStartRowIndex = inferDataStartRowIndex_(allValues, headerRowIndex, mpnColIndex, qtyColIndex);
+  }
+
+  if (dataStartRowIndex + 1 > lastRow) {
+    throw new Error("Data start row is beyond last row.");
+  }
+
+  const warnings = [];
+  const mpnMap = new Map();
+  const items = [];
+
+  for (let r = dataStartRowIndex; r < allValues.length; r++) {
+    const row = allValues[r];
+
+    const mpn = toStr_(row[mpnColIndex]);
+    if (!mpn) continue;
+
+    const qtyVal = toQty_(row[qtyColIndex]);
+
+    if (qtyVal === "") warnings.push(`Row ${r + 1}: quantity blank for MPN "${mpn}"`);
+    if (typeof qtyVal === "string" && qtyVal !== "") warnings.push(`Row ${r + 1}: quantity not numeric ("${qtyVal}") for MPN "${mpn}"`);
+
+    if (aggregateSameMpn) {
+      const prev = mpnMap.get(mpn);
+      if (prev === undefined) {
+        mpnMap.set(mpn, qtyVal);
+      } else {
+        if (typeof prev === "number" && typeof qtyVal === "number") {
+          mpnMap.set(mpn, prev + qtyVal);
+        } else {
+          warnings.push(`MPN "${mpn}" duplicated but quantity is not clean numeric; kept first value.`);
+        }
+      }
+    } else {
+      items.push({ mpn, qtyVal });
+    }
+  }
+
+  if (aggregateSameMpn) {
+    for (const [mpn, qtyVal] of mpnMap.entries()) items.push({ mpn, qtyVal });
+  }
+
+  if (items.length === 0) {
+    // 여기서 빈 결과가 나오면, 대부분 "열 선택/헤더행 선택이 잘못됨" 케이스가 많습니다.
+    // 그래서 디버깅 도움을 주기 위해 인덱스 정보를 같이 넣어줍니다.
+    throw new Error(
+      `No valid rows found. (MPN column had no data after row ${dataStartRowIndex + 1})` +
+      ` / headerRow=${headerRowIndex + 1}, mpnCol=${mpnColIndex + 1}, qtyCol=${qtyColIndex + 1}`
+    );
+  }
+
+  return {
+    warnings,
+    items,
+    resolved: {
+      headerRowIndex,
+      dataStartRowIndex,
+      mpnColIndex,
+      qtyColIndex
+    }
+  };
+}
+
+/** ===== Converters ===== */
+
+/**
+ * Convert to Mouser template (.xlsx)
+ */
 function convertToMouserTemplate(req) {
   try {
     if (!req || !req.token || !req.token.sheetId) return { ok: false, error: "Missing token.sheetId" };
     if (!req.mapping) return { ok: false, error: "Missing mapping" };
 
     const sheetId = String(req.token.sheetId);
-    const headerRowIndex = Number(req.mapping.headerRowIndex);
-    const dataStartRowIndex = Number(req.mapping.dataStartRowIndex);
-    const mpnColIndex = Number(req.mapping.mpnColIndex);
-    const qtyColIndex = Number(req.mapping.qtyColIndex);
-    const aggregateSameMpn = !!req.mapping.aggregateSameMpn;
 
-    if (!isFinite(headerRowIndex) || headerRowIndex < 0) return { ok: false, error: "Invalid headerRowIndex" };
-    if (!isFinite(dataStartRowIndex) || dataStartRowIndex < 0) return { ok: false, error: "Invalid dataStartRowIndex" };
-    if (!isFinite(mpnColIndex) || mpnColIndex < 0) return { ok: false, error: "Invalid mpnColIndex" };
-    if (!isFinite(qtyColIndex) || qtyColIndex < 0) return { ok: false, error: "Invalid qtyColIndex" };
+    const { warnings, items, resolved } = readMappedRows_(sheetId, req.mapping);
 
-    const inSS = SpreadsheetApp.openById(sheetId);
-    const inSh = inSS.getSheets()[0];
-    const lastRow = inSh.getLastRow();
-    const lastCol = inSh.getLastColumn();
-    if (lastRow < 1 || lastCol < 1) return { ok: false, error: "No data in source sheet." };
+    const outRows = items.map(({ mpn, qtyVal }) => {
+      const out = new Array(MOUSER_HEADERS.length).fill("");
+      out[0] = mpn;     // "Mfr Part Number (Input)"
+      out[5] = qtyVal;  // "Quantity 1"
+      return out;
+    });
 
-    const startRow1 = dataStartRowIndex + 1; // 1-based
-    if (startRow1 > lastRow) return { ok: false, error: "Data start row is beyond last row." };
-
-    const neededMaxCol = Math.max(mpnColIndex, qtyColIndex) + 1;
-    if (neededMaxCol > lastCol) return { ok: false, error: `Selected column index exceeds sheet columns. maxCol=${lastCol}` };
-
-    const numRows = lastRow - dataStartRowIndex;
-    const rows = inSh.getRange(startRow1, 1, numRows, neededMaxCol).getValues();
-
-    const warnings = [];
-
-    function toMpnStr(v) {
-      if (v === null || v === undefined) return "";
-      return String(v).trim();
-    }
-
-    function toQtyValue(v) {
-      if (v === null || v === undefined || v === "") return "";
-      if (typeof v === "number") return v;
-      const s = String(v).trim();
-      if (!s) return "";
-      const n = Number(s.replace(/,/g, ""));
-      if (isFinite(n)) return n;
-      return s; // If not numeric, keep original string
-    }
-
-    const mpnMap = new Map();
-    const outRows = [];
-
-    for (let i = 0; i < rows.length; i++) {
-      const row = rows[i];
-      const mpn = toMpnStr(row[mpnColIndex]);
-      if (!mpn) continue;
-
-      const qtyVal = toQtyValue(row[qtyColIndex]);
-      if (qtyVal === "") warnings.push(`Row ${startRow1 + i}: quantity blank for MPN "${mpn}"`);
-      if (typeof qtyVal === "string" && qtyVal !== "") warnings.push(`Row ${startRow1 + i}: quantity not numeric ("${qtyVal}") for MPN "${mpn}"`);
-
-      if (aggregateSameMpn) {
-        const prev = mpnMap.get(mpn);
-        if (prev === undefined) {
-          mpnMap.set(mpn, qtyVal);
-        } else {
-          if (typeof prev === "number" && typeof qtyVal === "number") {
-            mpnMap.set(mpn, prev + qtyVal);
-          } else {
-            warnings.push(`MPN "${mpn}" duplicated but quantity is not clean numeric; kept first value.`);
-          }
-        }
-      } else {
-        const out = new Array(MOUSER_HEADERS.length).fill("");
-        out[0] = mpn;
-        out[5] = qtyVal;
-        outRows.push(out);
-      }
-    }
-
-    if (aggregateSameMpn) {
-      for (const [mpn, qtyVal] of mpnMap.entries()) {
-        const out = new Array(MOUSER_HEADERS.length).fill("");
-        out[0] = mpn;
-        out[5] = qtyVal;
-        outRows.push(out);
-      }
-    }
-
-    if (outRows.length === 0) return { ok: false, error: "No valid rows found (MPN column had no data)." };
-
-    // Create output Google Sheets
     const outSS = SpreadsheetApp.create(
       `Mouser_BOM_${Utilities.formatDate(new Date(), Session.getScriptTimeZone(), "yyyyMMdd_HHmmss")}`
     );
@@ -241,10 +395,13 @@ function convertToMouserTemplate(req) {
     sheet1.getRange(1, 1, 1, MOUSER_HEADERS.length).setValues([MOUSER_HEADERS]);
     sheet1.getRange(2, 1, outRows.length, MOUSER_HEADERS.length).setValues(outRows);
 
+    // Mouser template usually has 3 sheets in their sample
     outSS.insertSheet("Sheet2");
     outSS.insertSheet("Sheet3");
 
-    // Export via UrlFetchApp
+    SpreadsheetApp.flush();
+    Utilities.sleep(800);
+
     const exp = exportGoogleFileAsXlsxBlob_(outSS.getId(), "mouser_bom.xlsx");
     if (!exp.ok) return { ok: false, error: exp.error };
 
@@ -253,14 +410,68 @@ function convertToMouserTemplate(req) {
 
     return {
       ok: true,
+      itemsCount: items.length,
       warnings,
+      resolved,
       download: {
         filename: "mouser_bom.xlsx",
         mimeType: exp.mimeType,
         dataUrl
       }
     };
+  } catch (err) {
+    return { ok: false, error: String(err) };
+  }
+}
 
+/**
+ * Convert to Digi-Key template (.xlsx)
+ * Requirements:
+ *  - Header must be on row 2
+ *  - Column A header: "Manufacturer Product Number"
+ *  - Column B header: "Quantity"
+ */
+function convertToDigiKeyTemplate(req) {
+  try {
+    if (!req || !req.token || !req.token.sheetId) return { ok: false, error: "Missing token.sheetId" };
+    if (!req.mapping) return { ok: false, error: "Missing mapping" };
+
+    const sheetId = String(req.token.sheetId);
+
+    const { warnings, items, resolved } = readMappedRows_(sheetId, req.mapping);
+
+    const outRows = items.map(({ mpn, qtyVal }) => [mpn, qtyVal]);
+
+    const outSS = SpreadsheetApp.create(
+      `DigiKey_BOM_${Utilities.formatDate(new Date(), Session.getScriptTimeZone(), "yyyyMMdd_HHmmss")}`
+    );
+    const sh = outSS.getSheets()[0];
+    sh.setName("Sheet1");
+
+    // Row 1 blank by design
+    sh.getRange(2, 1, 1, DIGIKEY_HEADERS.length).setValues([DIGIKEY_HEADERS]);
+    sh.getRange(3, 1, outRows.length, DIGIKEY_HEADERS.length).setValues(outRows);
+
+    SpreadsheetApp.flush();
+    Utilities.sleep(800);
+
+    const exp = exportGoogleFileAsXlsxBlob_(outSS.getId(), "digikey_bom.xlsx");
+    if (!exp.ok) return { ok: false, error: exp.error };
+
+    const b64 = Utilities.base64Encode(exp.blob.getBytes());
+    const dataUrl = `data:${exp.mimeType};base64,${b64}`;
+
+    return {
+      ok: true,
+      itemsCount: items.length,
+      warnings,
+      resolved,
+      download: {
+        filename: "digikey_bom.xlsx",
+        mimeType: exp.mimeType,
+        dataUrl
+      }
+    };
   } catch (err) {
     return { ok: false, error: String(err) };
   }
