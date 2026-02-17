@@ -1,16 +1,19 @@
 /**
  * EDA BOM Converter Web App (Mouser + Digi-Key)
+ * - Upload & Preview
+ * - Header row selection (frontend)
+ * - Column mapping: auto-detect + dropdown override
+ * - Data start row auto-scan
+ * - Export XLSX via Drive API v3 export endpoint
  *
- * Fix for: Drive.Files.copy userRateLimitExceeded
- * - Add LockService to reduce concurrent Drive API calls
- * - Add exponential backoff + jitter retry for Drive.Files.copy
- * - Return retriable error info to frontend (waitSeconds)
+ * IMPORTANT: Rate limit mitigation
+ *  - Use LockService to prevent bursts
+ *  - Exponential backoff retries for Drive.Files.copy
  *
- * References:
- * - Drive API usage limits / rate limit behaviors: https://developers.google.com/workspace/drive/api/guides/limits
- * - Drive API error handling (userRateLimitExceeded -> exponential backoff): https://developers.google.com/workspace/drive/api/guides/handle-errors
+ * Requirements:
+ * - Advanced Drive Service enabled (Drive API)
+ * - OAuth scopes: drive, spreadsheets, script.external_request
  */
-
 function doGet() {
   return HtmlService.createHtmlOutputFromFile("Index")
     .setTitle("EDA BOM Converter (Mouser / Digi-Key)")
@@ -51,181 +54,134 @@ const MOUSER_HEADERS = [
   "Design Risk"
 ];
 
-// Digi-Key headers (MUST match exactly)
+// Digi-Key headers (must match template expectation used by your workflow)
 const DIGIKEY_HEADERS = ["Manufacturer Product Number", "Quantity"];
 
-/** ===== Helpers ===== */
-function toStr_(v) {
-  if (v === null || v === undefined) return "";
-  return String(v).trim();
-}
-function toQty_(v) {
-  if (v === null || v === undefined || v === "") return "";
-  if (typeof v === "number") return v;
-  const s = String(v).trim();
-  if (!s) return "";
-  const n = Number(s.replace(/,/g, ""));
-  if (isFinite(n)) return n;
-  return s; // keep original if not numeric
+/** ===== Rate limit helpers ===== */
+function sleepMs_(ms) {
+  Utilities.sleep(ms);
 }
 
-/**
- * Decide whether an error is retriable (rate limit / backend / 429/5xx).
- * We rely on message patterns from Drive API and Apps Script wrapped exceptions.
- */
-function isRetriableDriveError_(errMsg) {
-  const s = String(errMsg || "");
-  // Typical reasons:
-  // - "User rate limit exceeded"
-  // - "Rate Limit Exceeded"
-  // - "Too Many Requests"
-  // - "quota exceeded" (sometimes)
-  return /user rate limit exceeded/i.test(s) ||
-         /userratelimitexceeded/i.test(s) ||
-         /rate limit exceeded/i.test(s) ||
-         /ratelimitexceeded/i.test(s) ||
-         /too many requests/i.test(s) ||
-         /\b429\b/.test(s);
-}
-
-/**
- * Exponential backoff with jitter (bounded).
- * attempt: 0..N-1
- */
-function backoffSleepMs_(attempt) {
-  const base = 600;              // 0.6s
-  const cap = 15000;             // 15s max per sleep
-  const exp = Math.min(cap, base * Math.pow(2, attempt));
-  const jitter = Math.floor(Math.random() * 350); // 0~350ms
-  return exp + jitter;
-}
-
-/**
- * Convert uploaded file to Google Sheets using Drive API copy with retry.
- * Also uses LockService to reduce concurrent Drive API requests.
- */
-function copyToSheetsWithRetry_(srcFileId, filename) {
+function withLock_(fn) {
   const lock = LockService.getScriptLock();
-  // Try to serialize heavy Drive operations to reduce bursts
-  lock.tryLock(30000); // up to 30s
+  // Try up to 30s to acquire
+  lock.waitLock(30000);
   try {
-    const maxAttempts = 6; // 0..5 (worst-case sleep ~0.6+1.2+2.4+4.8+9.6=~18.6s)
-    let lastErr = null;
-
-    for (let attempt = 0; attempt < maxAttempts; attempt++) {
-      try {
-        const converted = Drive.Files.copy(
-          { title: filename, mimeType: MimeType.GOOGLE_SHEETS },
-          srcFileId
-        );
-        return { ok: true, sheetId: converted.id };
-      } catch (e) {
-        const msg = String(e);
-        lastErr = msg;
-
-        if (!isRetriableDriveError_(msg)) {
-          return { ok: false, error: msg, retriable: false };
-        }
-        const sleepMs = backoffSleepMs_(attempt);
-        Utilities.sleep(sleepMs);
-      }
-    }
-    // Still failing after retries
-    return {
-      ok: false,
-      error: lastErr || "Drive copy failed after retries.",
-      retriable: true,
-      waitSeconds: 15
-    };
+    return fn();
   } finally {
-    try { lock.releaseLock(); } catch (_) {}
+    lock.releaseLock();
   }
 }
 
 /**
+ * Exponential backoff wrapper for Drive API calls
+ * - Retries on typical rate/temporary errors (403 userRateLimitExceeded, 429, 503)
+ * Google Drive API recommends exponential backoff for rate limit / transient errors. :contentReference[oaicite:2]{index=2}
+ */
+function retryDriveCall_(fn, opts) {
+  const maxAttempts = (opts && opts.maxAttempts) || 6;
+  const baseDelayMs = (opts && opts.baseDelayMs) || 600; // start 0.6s
+  let lastErr = null;
+
+  for (let attempt = 1; attempt <= maxAttempts; attempt++) {
+    try {
+      return fn();
+    } catch (e) {
+      const msg = String(e);
+      lastErr = e;
+
+      // Heuristics for transient/rate errors
+      const isRate =
+        msg.includes("userRateLimitExceeded") ||
+        msg.includes("Rate Limit Exceeded") ||
+        msg.includes("User rate limit exceeded") ||
+        msg.includes("429") ||
+        msg.includes("503");
+
+      if (!isRate || attempt === maxAttempts) break;
+
+      const delay = Math.min(8000, baseDelayMs * Math.pow(2, attempt - 1));
+      sleepMs_(delay);
+    }
+  }
+  throw lastErr;
+}
+
+/** ===== Upload & Preview =====
  * Upload file as base64 dataURL, store temporarily, convert to Google Sheets,
  * return a preview matrix to the frontend.
  */
 function uploadAndGetPreview(payload) {
-  let srcFileId = null;
-  let sheetId = null;
-
-  try {
-    if (!payload || !payload.dataUrl) return { ok: false, error: "No file data received." };
-
-    const filename = String(payload.filename || "uploaded_file");
-    const mimeType = String(payload.mimeType || "application/octet-stream");
-    const dataUrl = String(payload.dataUrl);
-
-    const commaIndex = dataUrl.indexOf(",");
-    if (commaIndex < 0) return { ok: false, error: "Invalid dataUrl format (missing comma)." };
-
-    const header = dataUrl.slice(0, commaIndex);
-    const base64 = dataUrl.slice(commaIndex + 1);
-    if (!header.includes(";base64")) return { ok: false, error: "Invalid dataUrl header (missing ;base64)." };
-
-    const bytes = Utilities.base64Decode(base64);
-    const sizeBytes = bytes.length;
-
-    if (sizeBytes > MAX_BYTES) {
-      return { ok: false, error: `File too large: ${sizeBytes} bytes (limit: ${MAX_BYTES} bytes).` };
-    }
-
-    // 1) Save original file temporarily
-    const blob = Utilities.newBlob(bytes, mimeType, filename);
-    const srcFile = DriveApp.createFile(blob);
-    srcFileId = srcFile.getId();
-
-    // 2) Convert to Google Sheets with retry (Drive API v3)
-    const copied = copyToSheetsWithRetry_(srcFileId, filename);
-    if (!copied.ok) {
-      return {
-        ok: false,
-        error: copied.error,
-        retriable: !!copied.retriable,
-        waitSeconds: copied.waitSeconds || 8
-      };
-    }
-    sheetId = copied.sheetId;
-
-    // 3) Read preview
-    const ss = SpreadsheetApp.openById(sheetId);
-    const sh = ss.getSheets()[0];
-    const lastRow = sh.getLastRow();
-    const lastCol = sh.getLastColumn();
-
-    if (lastRow < 1 || lastCol < 1) {
-      return {
-        ok: false,
-        error: "No data detected in the sheet.",
-        token: { srcFileId, sheetId }
-      };
-    }
-
-    const PREVIEW_ROWS = Math.min(120, lastRow);
-    const PREVIEW_COLS = Math.min(40, lastCol);
-    const values = sh.getRange(1, 1, PREVIEW_ROWS, PREVIEW_COLS).getValues();
-
-    return {
-      ok: true,
-      token: { srcFileId, sheetId },
-      preview: { values, rowCount: PREVIEW_ROWS, colCount: PREVIEW_COLS },
-      serverTime: new Date().toISOString()
-    };
-
-  } catch (err) {
-    return { ok: false, error: String(err) };
-  } finally {
-    // Cleanup: we no longer need the raw uploaded binary file after conversion
-    // (it reduces Drive clutter; does not directly fix quota, but good hygiene)
+  return withLock_(function () {
     try {
-      if (srcFileId) DriveApp.getFileById(srcFileId).setTrashed(true);
-    } catch (_) {}
-  }
+      if (!payload || !payload.dataUrl) return { ok: false, error: "No file data received." };
+
+      const filename = String(payload.filename || "uploaded_file");
+      const mimeType = String(payload.mimeType || "application/octet-stream");
+      const dataUrl = String(payload.dataUrl);
+
+      const commaIndex = dataUrl.indexOf(",");
+      if (commaIndex < 0) return { ok: false, error: "Invalid dataUrl format (missing comma)." };
+
+      const header = dataUrl.slice(0, commaIndex);
+      const base64 = dataUrl.slice(commaIndex + 1);
+
+      if (!header.includes(";base64")) return { ok: false, error: "Invalid dataUrl header (missing ;base64)." };
+
+      const bytes = Utilities.base64Decode(base64);
+      const sizeBytes = bytes.length;
+
+      if (sizeBytes > MAX_BYTES) {
+        return { ok: false, error: `File too large: ${sizeBytes} bytes (limit: ${MAX_BYTES} bytes).` };
+      }
+
+      // 1) Save original file temporarily
+      const blob = Utilities.newBlob(bytes, mimeType, filename);
+      const srcFile = DriveApp.createFile(blob);
+
+      // 2) Convert to Google Sheets (Advanced Drive Service)
+      // Rate limit mitigation: exponential backoff
+      const converted = retryDriveCall_(function () {
+        return Drive.Files.copy(
+          { title: filename, mimeType: MimeType.GOOGLE_SHEETS },
+          srcFile.getId()
+        );
+      }, { maxAttempts: 6, baseDelayMs: 700 });
+
+      const sheetId = converted.id;
+
+      // 3) Read preview
+      const ss = SpreadsheetApp.openById(sheetId);
+      const sh = ss.getSheets()[0];
+      const lastRow = sh.getLastRow();
+      const lastCol = sh.getLastColumn();
+
+      if (lastRow < 1 || lastCol < 1) {
+        return { ok: false, error: "No data detected in the sheet.", token: { srcFileId: srcFile.getId(), sheetId } };
+      }
+
+      const PREVIEW_ROWS = Math.min(120, lastRow);
+      const PREVIEW_COLS = Math.min(40, lastCol);
+      const values = sh.getRange(1, 1, PREVIEW_ROWS, PREVIEW_COLS).getValues();
+
+      // Clean up original uploaded file (optional but recommended to reduce clutter)
+      try { srcFile.setTrashed(true); } catch (_) {}
+
+      return {
+        ok: true,
+        token: { srcFileId: srcFile.getId(), sheetId },
+        preview: { values, rowCount: PREVIEW_ROWS, colCount: PREVIEW_COLS },
+        serverTime: new Date().toISOString()
+      };
+    } catch (err) {
+      return { ok: false, error: String(err) };
+    }
+  });
 }
 
 /**
  * Export Google Sheets file as XLSX Blob via Drive API v3 export endpoint.
+ * Drive API export method: files.export :contentReference[oaicite:3]{index=3}
  */
 function exportGoogleFileAsXlsxBlob_(fileId, filenameForBlob) {
   const exportMime = "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet";
@@ -250,6 +206,22 @@ function exportGoogleFileAsXlsxBlob_(fileId, filenameForBlob) {
 
   const blob = res.getBlob().setName(filenameForBlob || "output.xlsx");
   return { ok: true, blob, mimeType: exportMime };
+}
+
+/** ===== Helpers ===== */
+function toStr_(v) {
+  if (v === null || v === undefined) return "";
+  return String(v).trim();
+}
+
+function toQty_(v) {
+  if (v === null || v === undefined || v === "") return "";
+  if (typeof v === "number") return v;
+  const s = String(v).trim();
+  if (!s) return "";
+  const n = Number(s.replace(/,/g, ""));
+  if (isFinite(n)) return n;
+  return s; // keep original if not numeric
 }
 
 /**
@@ -294,12 +266,13 @@ function detectColsFromHeaderRow_(headerRow) {
       if (/\bpart\b/.test(lower[i])) { mpn = i; break; }
     }
   }
+
   return { mpnColIndex: mpn, qtyColIndex: qty };
 }
 
 /**
  * Determine effective data start row index (0-based).
- * - scan from headerRowIndex+1 downward; first row where (mpn OR qty) not blank
+ * - Scan from headerRowIndex+1 downward; first row where (mpn OR qty) not blank
  * If none found, returns headerRowIndex+1.
  */
 function inferDataStartRowIndex_(values2d, headerRowIndex, mpnColIndex, qtyColIndex) {
@@ -318,19 +291,13 @@ function inferDataStartRowIndex_(values2d, headerRowIndex, mpnColIndex, qtyColIn
  * mapping:
  * - headerRowIndex (required, 0-based)
  * - mpnColIndex / qtyColIndex (optional, 0-based, dropdown override)
- * - dataStartRowIndex (optional, 0-based)
- * - aggregateSameMpn (optional)
  */
 function readMappedRows_(sheetId, mapping) {
   const headerRowIndex = Number(mapping.headerRowIndex);
   if (!isFinite(headerRowIndex) || headerRowIndex < 0) throw new Error("Invalid headerRowIndex");
 
-  const aggregateSameMpn = !!mapping.aggregateSameMpn;
-
   const providedMpn = (mapping.mpnColIndex !== undefined && mapping.mpnColIndex !== null) ? Number(mapping.mpnColIndex) : null;
   const providedQty = (mapping.qtyColIndex !== undefined && mapping.qtyColIndex !== null) ? Number(mapping.qtyColIndex) : null;
-
-  const providedDataStart = (mapping.dataStartRowIndex !== undefined && mapping.dataStartRowIndex !== null) ? Number(mapping.dataStartRowIndex) : null;
 
   const inSS = SpreadsheetApp.openById(String(sheetId));
   const inSh = inSS.getSheets()[0];
@@ -350,7 +317,7 @@ function readMappedRows_(sheetId, mapping) {
   if (providedMpn !== null && isFinite(providedMpn) && providedMpn >= 0) mpnColIndex = providedMpn;
   if (providedQty !== null && isFinite(providedQty) && providedQty >= 0) qtyColIndex = providedQty;
 
-  // If not provided, auto-detect from header row
+  // Auto-detect if not provided
   if (mpnColIndex === null || qtyColIndex === null) {
     const headerRow = allValues[headerRowIndex] || [];
     const det = detectColsFromHeaderRow_(headerRow);
@@ -366,20 +333,12 @@ function readMappedRows_(sheetId, mapping) {
     throw new Error(`Selected column index exceeds sheet columns. lastCol=${lastCol}`);
   }
 
-  // Data start row index (0-based)
-  let dataStartRowIndex = null;
-  if (providedDataStart !== null && isFinite(providedDataStart) && providedDataStart >= 0) {
-    dataStartRowIndex = providedDataStart;
-  } else {
-    dataStartRowIndex = inferDataStartRowIndex_(allValues, headerRowIndex, mpnColIndex, qtyColIndex);
-  }
-
+  const dataStartRowIndex = inferDataStartRowIndex_(allValues, headerRowIndex, mpnColIndex, qtyColIndex);
   if (dataStartRowIndex + 1 > lastRow) {
     throw new Error("Data start row is beyond last row.");
   }
 
   const warnings = [];
-  const mpnMap = new Map();
   const items = [];
 
   for (let r = dataStartRowIndex; r < allValues.length; r++) {
@@ -391,24 +350,7 @@ function readMappedRows_(sheetId, mapping) {
     if (qtyVal === "") warnings.push(`Row ${r + 1}: quantity blank for MPN "${mpn}"`);
     if (typeof qtyVal === "string" && qtyVal !== "") warnings.push(`Row ${r + 1}: quantity not numeric ("${qtyVal}") for MPN "${mpn}"`);
 
-    if (aggregateSameMpn) {
-      const prev = mpnMap.get(mpn);
-      if (prev === undefined) {
-        mpnMap.set(mpn, qtyVal);
-      } else {
-        if (typeof prev === "number" && typeof qtyVal === "number") {
-          mpnMap.set(mpn, prev + qtyVal);
-        } else {
-          warnings.push(`MPN "${mpn}" duplicated but quantity is not clean numeric; kept first value.`);
-        }
-      }
-    } else {
-      items.push({ mpn, qtyVal });
-    }
-  }
-
-  if (aggregateSameMpn) {
-    for (const [mpn, qtyVal] of mpnMap.entries()) items.push({ mpn, qtyVal });
+    items.push({ mpn, qtyVal });
   }
 
   if (items.length === 0) {
@@ -427,91 +369,95 @@ function readMappedRows_(sheetId, mapping) {
 
 /** ===== Converters ===== */
 function convertToMouserTemplate(req) {
-  try {
-    if (!req || !req.token || !req.token.sheetId) return { ok: false, error: "Missing token.sheetId" };
-    if (!req.mapping) return { ok: false, error: "Missing mapping" };
+  return withLock_(function () {
+    try {
+      if (!req || !req.token || !req.token.sheetId) return { ok: false, error: "Missing token.sheetId" };
+      if (!req.mapping) return { ok: false, error: "Missing mapping" };
 
-    const sheetId = String(req.token.sheetId);
-    const { warnings, items, resolved } = readMappedRows_(sheetId, req.mapping);
+      const sheetId = String(req.token.sheetId);
+      const { warnings, items, resolved } = readMappedRows_(sheetId, req.mapping);
 
-    const outRows = items.map(({ mpn, qtyVal }) => {
-      const out = new Array(MOUSER_HEADERS.length).fill("");
-      out[0] = mpn;     // "Mfr Part Number (Input)"
-      out[5] = qtyVal;  // "Quantity 1"
-      return out;
-    });
+      const outRows = items.map(({ mpn, qtyVal }) => {
+        const out = new Array(MOUSER_HEADERS.length).fill("");
+        out[0] = mpn;     // "Mfr Part Number (Input)"
+        out[5] = qtyVal;  // "Quantity 1"
+        return out;
+      });
 
-    const outSS = SpreadsheetApp.create(
-      `Mouser_BOM_${Utilities.formatDate(new Date(), Session.getScriptTimeZone(), "yyyyMMdd_HHmmss")}`
-    );
-    const sheet1 = outSS.getSheets()[0];
-    sheet1.setName("Sheet1");
-    sheet1.getRange(1, 1, 1, MOUSER_HEADERS.length).setValues([MOUSER_HEADERS]);
-    sheet1.getRange(2, 1, outRows.length, MOUSER_HEADERS.length).setValues(outRows);
+      const outSS = SpreadsheetApp.create(
+        `Mouser_BOM_${Utilities.formatDate(new Date(), Session.getScriptTimeZone(), "yyyyMMdd_HHmmss")}`
+      );
+      const sheet1 = outSS.getSheets()[0];
+      sheet1.setName("Sheet1");
+      sheet1.getRange(1, 1, 1, MOUSER_HEADERS.length).setValues([MOUSER_HEADERS]);
+      sheet1.getRange(2, 1, outRows.length, MOUSER_HEADERS.length).setValues(outRows);
 
-    outSS.insertSheet("Sheet2");
-    outSS.insertSheet("Sheet3");
+      // Mouser sample often has 3 sheets
+      outSS.insertSheet("Sheet2");
+      outSS.insertSheet("Sheet3");
 
-    SpreadsheetApp.flush();
-    Utilities.sleep(800);
+      SpreadsheetApp.flush();
+      Utilities.sleep(800);
 
-    const exp = exportGoogleFileAsXlsxBlob_(outSS.getId(), "mouser_bom.xlsx");
-    if (!exp.ok) return { ok: false, error: exp.error };
+      const exp = exportGoogleFileAsXlsxBlob_(outSS.getId(), "mouser_bom.xlsx");
+      if (!exp.ok) return { ok: false, error: exp.error };
 
-    const b64 = Utilities.base64Encode(exp.blob.getBytes());
-    const dataUrl = `data:${exp.mimeType};base64,${b64}`;
+      const b64 = Utilities.base64Encode(exp.blob.getBytes());
+      const dataUrl = `data:${exp.mimeType};base64,${b64}`;
 
-    return {
-      ok: true,
-      itemsCount: items.length,
-      warnings,
-      resolved,
-      download: { filename: "mouser_bom.xlsx", mimeType: exp.mimeType, dataUrl }
-    };
-
-  } catch (err) {
-    return { ok: false, error: String(err) };
-  }
+      return {
+        ok: true,
+        itemsCount: items.length,
+        warnings,
+        resolved,
+        download: { filename: "mouser_bom.xlsx", mimeType: exp.mimeType, dataUrl }
+      };
+    } catch (err) {
+      return { ok: false, error: String(err) };
+    }
+  });
 }
 
 function convertToDigiKeyTemplate(req) {
-  try {
-    if (!req || !req.token || !req.token.sheetId) return { ok: false, error: "Missing token.sheetId" };
-    if (!req.mapping) return { ok: false, error: "Missing mapping" };
+  return withLock_(function () {
+    try {
+      if (!req || !req.token || !req.token.sheetId) return { ok: false, error: "Missing token.sheetId" };
+      if (!req.mapping) return { ok: false, error: "Missing mapping" };
 
-    const sheetId = String(req.token.sheetId);
-    const { warnings, items, resolved } = readMappedRows_(sheetId, req.mapping);
+      const sheetId = String(req.token.sheetId);
+      const { warnings, items, resolved } = readMappedRows_(sheetId, req.mapping);
 
-    const outRows = items.map(({ mpn, qtyVal }) => [mpn, qtyVal]);
+      const outRows = items.map(({ mpn, qtyVal }) => [mpn, qtyVal]);
 
-    const outSS = SpreadsheetApp.create(
-      `DigiKey_BOM_${Utilities.formatDate(new Date(), Session.getScriptTimeZone(), "yyyyMMdd_HHmmss")}`
-    );
-    const sh = outSS.getSheets()[0];
-    sh.setName("Sheet1");
+      const outSS = SpreadsheetApp.create(
+        `DigiKey_BOM_${Utilities.formatDate(new Date(), Session.getScriptTimeZone(), "yyyyMMdd_HHmmss")}`
+      );
+      const sh = outSS.getSheets()[0];
+      sh.setName("Sheet1");
 
-    // Row 1 blank by design
-    sh.getRange(2, 1, 1, DIGIKEY_HEADERS.length).setValues([DIGIKEY_HEADERS]);
-    sh.getRange(3, 1, outRows.length, DIGIKEY_HEADERS.length).setValues(outRows);
+      // Keep your current template behavior:
+      // Row 1 blank, headers at row 2
+      sh.getRange(2, 1, 1, DIGIKEY_HEADERS.length).setValues([DIGIKEY_HEADERS]);
+      sh.getRange(3, 1, outRows.length, DIGIKEY_HEADERS.length).setValues(outRows);
 
-    SpreadsheetApp.flush();
-    Utilities.sleep(800);
+      SpreadsheetApp.flush();
+      Utilities.sleep(800);
 
-    const exp = exportGoogleFileAsXlsxBlob_(outSS.getId(), "digikey_bom.xlsx");
-    if (!exp.ok) return { ok: false, error: exp.error };
+      const exp = exportGoogleFileAsXlsxBlob_(outSS.getId(), "digikey_bom.xlsx");
+      if (!exp.ok) return { ok: false, error: exp.error };
 
-    const b64 = Utilities.base64Encode(exp.blob.getBytes());
-    const dataUrl = `data:${exp.mimeType};base64,${b64}`;
+      const b64 = Utilities.base64Encode(exp.blob.getBytes());
+      const dataUrl = `data:${exp.mimeType};base64,${b64}`;
 
-    return {
-      ok: true,
-      itemsCount: items.length,
-      warnings,
-      resolved,
-      download: { filename: "digikey_bom.xlsx", mimeType: exp.mimeType, dataUrl }
-    };
-
-  } catch (err) {
-    return { ok: false, error: String(err) };
-  }
+      return {
+        ok: true,
+        itemsCount: items.length,
+        warnings,
+        resolved,
+        download: { filename: "digikey_bom.xlsx", mimeType: exp.mimeType, dataUrl }
+      };
+    } catch (err) {
+      return { ok: false, error: String(err) };
+    }
+  });
 }
