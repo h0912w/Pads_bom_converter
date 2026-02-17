@@ -25,15 +25,13 @@
     .row{display:flex;gap:10px;align-items:center;flex-wrap:wrap;}
     .muted{color:var(--muted);font-size:13px;line-height:1.5;}
     .pill{display:inline-block;padding:4px 10px;border:1px solid var(--border);border-radius:999px;font-size:12px;color:var(--text);background:var(--bg2);}
-    button{
-      padding:10px 14px;border:0;border-radius:12px;background:var(--btn);color:#fff;cursor:pointer;
-    }
+    button{padding:10px 14px;border:0;border-radius:12px;background:var(--btn);color:#fff;cursor:pointer;}
     button:disabled{opacity:.55;cursor:not-allowed;}
     .btnSecondary{background:#fff;color:var(--text);border:1px solid var(--border);}
     .btnGhost{background:var(--bg2);color:var(--text);border:1px solid var(--border);}
-    .btnDanger{background:#991b1b;}
     .btnPrimary{background:var(--btn);}
     pre{background:var(--bg2);border:1px solid var(--border);border-radius:12px;padding:10px;overflow:auto;max-height:220px;}
+
     /* ===== Modal ===== */
     .backdrop{
       position:fixed; inset:0;
@@ -44,7 +42,7 @@
     }
     .modal{
       width:min(1160px, 98vw);
-      height:min(86vh, 860px);
+      height:min(92vh, 920px);
       background:#fff;
       border-radius:16px;
       border:1px solid rgba(255,255,255,.2);
@@ -58,14 +56,13 @@
       border-bottom:1px solid var(--border);
       background:#fff;
     }
-    .modalTitle{
-      display:flex;gap:10px;align-items:center;flex-wrap:wrap;
-    }
+    .modalTitle{display:flex;gap:10px;align-items:center;flex-wrap:wrap;}
     .modalTitle h2{margin:0;font-size:16px;}
     .modalBody{
       padding:14px;
       flex:1;
-      overflow:hidden;
+      overflow:auto;              /* ✅ 모달 자체도 내부 스크롤 가능 */
+      -webkit-overflow-scrolling:touch;
       background:#fff;
     }
     .modalFooter{
@@ -81,14 +78,16 @@
       cursor:pointer;font-size:18px;color:var(--text);
     }
     .closeX:hover{background:var(--bg2);}
-    .stepPane{display:none;height:100%;}
+
+    /* Step panes */
+    .stepPane{display:none;}
     .stepPane.active{display:block;}
 
+    /* Step 2 layout */
     .grid{
       display:grid;
       grid-template-columns: 1.35fr 0.85fr;
       gap:12px;
-      height:100%;
       min-height:0;
     }
     .leftPane, .rightPane{min-height:0;}
@@ -98,51 +97,23 @@
       padding:12px;
       background:#fff;
       overflow:auto;
+      -webkit-overflow-scrolling:touch;
       max-height:100%;
-      position:relative;
     }
-
-    /* ✅ NEW: sticky mapping bar so MPN/QTY never “disappear” */
-    .stickyMapBar{
-      position:sticky;
-      top:0;
-      z-index:10;
-      background:#fff;
-      border:1px solid var(--border);
-      border-radius:12px;
-      padding:10px;
-      box-shadow:0 6px 18px rgba(0,0,0,.06);
-    }
-    .infoBox{
-      border:1px solid rgba(37,99,235,.35);
-      background:#eff6ff;
-      border-radius:12px;
-      padding:10px;
-      margin-top:10px;
-      color:#0f172a;
-      font-size:13px;
-      line-height:1.5;
-    }
-
-    .sectionTitle{
-      margin:0 0 8px;
-      font-size:14px;
-    }
+    .sectionTitle{margin:0 0 8px;font-size:14px;}
     .divider{border:0;border-top:1px solid var(--border);margin:12px 0;}
     select{
       padding:8px 10px;border:1px solid var(--border);border-radius:10px;background:#fff;
       font-size:13px;color:var(--text);max-width:100%;
     }
     label{font-size:13px;color:var(--text);}
+
+    /* ===== Table container ===== */
     .tableOuter{
       border:1px solid var(--border);
       border-radius:14px;
       overflow:hidden;
       background:#fff;
-      height:100%;
-      min-height:0;
-      display:flex;
-      flex-direction:column;
     }
     .hScrollTop{
       height:16px;
@@ -150,17 +121,24 @@
       overflow-y:hidden;
       border-bottom:1px solid var(--border);
       background:var(--bg2);
+      -webkit-overflow-scrolling:touch;
     }
     .hScrollSpacer{height:1px;}
+
+    /* ✅ 4행 정도만 보이도록 높이 제한 + 내부 세로/가로 스크롤 */
     .tableWrap{
       position:relative;
-      overflow:auto;
-      flex:1;
-      min-height:0;
+      height:230px;               /* ✅ 약 4~5행 정도 보이게 */
+      overflow:auto;              /* ✅ 가로/세로 모두 스크롤 */
+      -webkit-overflow-scrolling:touch;
       background:#fff;
     }
-    table{border-collapse:collapse;width:100%;min-width:920px;}
-    th, td{border-bottom:1px solid #f1f5f9;border-right:1px solid #f1f5f9;padding:6px 8px;font-size:13px;white-space:nowrap;}
+
+    table{border-collapse:collapse;width:max-content;}  /* ✅ 내용 너비만큼 늘려 가로 스크롤 가능 */
+    th, td{
+      border-bottom:1px solid #f1f5f9;border-right:1px solid #f1f5f9;
+      padding:6px 8px;font-size:13px;white-space:nowrap;
+    }
     th{position:sticky;top:0;background:var(--bg2);z-index:2;text-align:left;}
     td{background:#fff;}
     tr:hover td{background:#fcfcfd;}
@@ -168,28 +146,40 @@
     td.clickable{cursor:pointer;}
     tr.headerSelected td{background:#e0f2fe !important;}
     tr.headerSelected td.rowIndex{background:#bae6fd !important;}
+
     .warn{color:var(--warn);font-size:13px;white-space:pre-wrap;}
     .ok{color:var(--ok);font-size:13px;white-space:pre-wrap;}
     code{background:#f3f4f6;padding:1px 6px;border-radius:6px;}
+
+    /* Step badges */
     .stepBadges{display:flex;gap:8px;align-items:center;flex-wrap:wrap;}
-    .badge{
-      padding:4px 10px;border:1px solid var(--border);border-radius:999px;
-      font-size:12px;background:var(--bg2);
-    }
-    .badge.active{
-      border-color:rgba(37,99,235,.5);
-      box-shadow:0 0 0 3px rgba(37,99,235,.12);
+    .badge{padding:4px 10px;border:1px solid var(--border);border-radius:999px;font-size:12px;background:var(--bg2);}
+    .badge.active{border-color:rgba(37,99,235,.5);box-shadow:0 0 0 3px rgba(37,99,235,.12);background:#eff6ff;}
+
+    /* Header guide box (절대 제거 금지) */
+    .guideBox{
+      margin:0 0 12px;
+      border:1px solid rgba(37,99,235,.35);
       background:#eff6ff;
+      border-radius:14px;
+      padding:12px;
     }
+    .guideBox h3{margin:0 0 8px;font-size:14px;}
+    .guideBox ul{margin:8px 0 0 18px;color:#1f2937;font-size:13px;line-height:1.55;}
+    .guideTopRow{display:flex;align-items:center;justify-content:space-between;gap:10px;}
+    .btnTiny{
+      padding:6px 10px;border-radius:999px;border:1px solid var(--border);
+      background:#fff;color:#111827;cursor:pointer;font-size:12px;
+    }
+
     @media (max-width: 980px){
-      .modal{height:min(90vh, 920px);}
+      .modal{height:min(94vh, 980px);}
       .grid{grid-template-columns:1fr;}
-      .rightPane{max-height:340px;}
-      table{min-width:880px;}
+      .rightPane{max-height:320px;}
+      .tableWrap{height:210px;}  /* 모바일에서 더 타이트하게 */
     }
   </style>
 </head>
-
 <body>
   <h1 style="margin:0 0 8px;">EDA BOM Converter (Mouser / Digi-Key)</h1>
   <p class="muted" style="margin:0 0 12px;">
@@ -208,15 +198,7 @@
     </div>
   </div>
 
-  <div class="card">
-    <h2 style="margin:0 0 10px;">Notes</h2>
-    <ul class="muted" style="margin:0 0 0 18px;">
-      <li>This tool is EDA-agnostic (OrCAD / Altium / KiCad / PADS exports all supported).</li>
-      <li>Digi-Key output: Row 1 blank, header on Row 2, headers exactly <b>Manufacturer Product Number</b>, <b>Quantity</b>.</li>
-      <li>If MPN samples look blank, it may mean data starts later. You can still convert after confirmation.</li>
-    </ul>
-  </div>
-
+  <!-- ===== Modal Backdrop ===== -->
   <div class="backdrop" id="backdrop" aria-hidden="true">
     <div class="modal" role="dialog" aria-modal="true" aria-labelledby="modalTitle">
       <div class="modalHeader">
@@ -255,48 +237,53 @@
 
         <!-- STEP 2 -->
         <div class="stepPane" id="step2">
+          <!-- ✅ 설명란: 절대 삭제 금지 / Hide 버튼으로 접기만 -->
+          <div class="guideBox" id="guideBox">
+            <div class="guideTopRow">
+              <h3>Header row selection (required)</h3>
+              <button class="btnTiny" id="btnHideGuide" type="button">Hide</button>
+            </div>
+            <div class="muted" style="margin-top:4px;">
+              Click the row that contains the column names (examples: <code>MPN</code>, <code>Part Number</code>, <code>Manufacturer Part Number</code>, <code>Qty</code>, <code>Quantity</code>).
+              Clicking any cell selects the entire row.
+            </div>
+            <ul>
+              <li>The tool tries to auto-detect <b>MPN (Part Number)</b> and <b>Quantity</b> from the header text.</li>
+              <li>If auto-detection is wrong, use the dropdowns below to select the correct columns.</li>
+              <li>If there are title/blank rows above the header, that is OK — just select the row that actually contains the column names.</li>
+              <li><b>Tip:</b> You can <b>scroll horizontally</b> inside the preview to see more columns.</li>
+            </ul>
+          </div>
+
           <div class="grid">
             <div class="leftPane">
               <div class="tableOuter">
                 <div class="hScrollTop" id="hScrollTop"><div class="hScrollSpacer" id="hScrollSpacer"></div></div>
                 <div class="tableWrap" id="tableWrap"></div>
               </div>
+
               <p class="muted" id="guideText" style="margin:10px 2px 0;">
                 Guide: Click the <b>header row</b> in the table. (Click any cell to select the whole row)
+                <br><span class="muted">Horizontal scroll: swipe left/right on the table (or use the top scroll bar).</span>
               </p>
             </div>
 
             <div class="rightPane">
-              <!-- ✅ NEW: Sticky mapping bar (always visible) -->
-              <div class="stickyMapBar">
-                <h3 class="sectionTitle" style="margin-bottom:6px;">Header row selection (required)</h3>
-                <div class="muted" id="headerPickState">Header row: not selected</div>
+              <h3 class="sectionTitle">Selection state</h3>
+              <div class="muted" id="headerPickState">Header row: not selected</div>
+              <div class="divider"></div>
 
-                <div class="infoBox">
-                  <b>How to select the header row:</b><br>
-                  Click the row that contains column names such as <code>MPN</code>, <code>Part Number</code>, <code>Qty</code>, <code>Quantity</code>.<br>
-                  After you click a row, the tool will auto-detect <b>MPN (Part Number)</b> and <b>Quantity</b> columns.<br>
-                  If auto-detection is wrong, use the dropdowns below to override.
-                </div>
-
-                <div class="divider"></div>
-
-                <h3 class="sectionTitle">Column mapping (auto + dropdown override)</h3>
-                <div class="row" style="margin-top:8px;">
-                  <label for="mpnSelect"><b>MPN (Part Number) column</b></label>
-                  <select id="mpnSelect" disabled></select>
-                </div>
-                <div class="row" style="margin-top:8px;">
-                  <label for="qtySelect"><b>Quantity column</b></label>
-                  <select id="qtySelect" disabled></select>
-                </div>
-                <div class="row" style="margin-top:10px;">
-                  <label class="muted"><input type="checkbox" id="chkAgg" /> Aggregate same MPN (sum Quantity)</label>
-                </div>
+              <h3 class="sectionTitle">Column mapping (auto + dropdown override)</h3>
+              <div class="row" style="margin-top:8px;">
+                <label for="mpnSelect"><b>MPN column</b></label>
+                <select id="mpnSelect" disabled></select>
+              </div>
+              <div class="row" style="margin-top:8px;">
+                <label for="qtySelect"><b>Quantity column</b></label>
+                <select id="qtySelect" disabled></select>
               </div>
 
               <div class="divider"></div>
-
               <h3 class="sectionTitle">Data start row + MPN samples</h3>
               <div class="muted" id="autoMapText">-</div>
               <pre id="mpnSamples" style="margin-top:10px;">(no samples)</pre>
@@ -311,12 +298,8 @@
           <div class="card" style="margin:0;">
             <h3 style="margin:0 0 10px;">Convert & Download</h3>
             <p class="muted" style="margin:0 0 10px;">
-              You can convert to either template:
-              <br>
-              <b>Mouser:</b> fills <code>Mfr Part Number (Input)</code> and <code>Quantity 1</code>.
-              <br>
-              <b>Digi-Key:</b> Row 1 blank, header on Row 2, headers exactly:
-              <code>Manufacturer Product Number</code>, <code>Quantity</code>.
+              Convert and download in .xlsx format.
+              Use the dropdowns in Step 2 if MPN/Quantity mapping is not correct.
             </p>
             <div class="row" style="margin-top:10px;">
               <button id="btnConvertMouser" disabled>Convert & Download (Mouser .xlsx)</button>
@@ -329,6 +312,7 @@
               <a id="downloadLink" href="#" download="">Download output.xlsx</a>
             </div>
           </div>
+
           <div style="margin-top:12px;">
             <h3 style="margin:0 0 8px;">Server Response (debug)</h3>
             <pre id="out2">{}</pre>
@@ -345,11 +329,20 @@
           <button id="btnResetAll" class="btnGhost" type="button">Reset</button>
         </div>
       </div>
-
     </div>
   </div>
 
 <script>
+  // ===== iframe auto-resize sender =====
+  function postHeightToParent(){
+    try{
+      const h = Math.max(document.documentElement.scrollHeight, document.body.scrollHeight);
+      window.parent && window.parent.postMessage({ type:'EDA_BOM_IFRAME_RESIZE', height: h }, '*');
+    }catch(e){}
+  }
+  window.addEventListener('load', () => { postHeightToParent(); setTimeout(postHeightToParent, 300); });
+  window.addEventListener('resize', () => { postHeightToParent(); });
+
   // ===== DOM =====
   const btnOpenWizard = document.getElementById('btnOpenWizard');
   const globalStagePill = document.getElementById('globalStagePill');
@@ -376,7 +369,6 @@
   const hScrollSpacer = document.getElementById('hScrollSpacer');
   const mpnSelect = document.getElementById('mpnSelect');
   const qtySelect = document.getElementById('qtySelect');
-  const chkAgg = document.getElementById('chkAgg');
   const autoMapText = document.getElementById('autoMapText');
   const mpnSamplesEl = document.getElementById('mpnSamples');
   const sampleWarn = document.getElementById('sampleWarn');
@@ -387,6 +379,9 @@
   const warningsEl = document.getElementById('warnings');
   const downloadArea = document.getElementById('downloadArea');
   const downloadLink = document.getElementById('downloadLink');
+  const guideBox = document.getElementById('guideBox');
+  const btnHideGuide = document.getElementById('btnHideGuide');
+
   const MAX_BYTES = 8 * 1024 * 1024;
 
   // ===== State =====
@@ -398,9 +393,12 @@
   let qtyColIndex = null;
   let effectiveDataStartRowIndex = null;
   let lastMpnSamplesBlank = false;
+  let scrollBindOnce = false;
 
+  // ===== Helpers =====
   function setGlobalStage(s){ globalStagePill.textContent = `Stage: ${s}`; }
-  function setStage(s){ stagePill.textContent = `Stage: ${s}`; setGlobalStage(s); }
+  function setStage(s){ stagePill.textContent = `Stage: ${s}`; setGlobalStage(s); postHeightToParent(); }
+
   function lockBodyScroll(lock){
     document.body.style.overflow = lock ? 'hidden' : '';
   }
@@ -411,24 +409,22 @@
     [...stepBadges.querySelectorAll('.badge')].forEach(b => {
       b.classList.toggle('active', Number(b.getAttribute('data-step')) === step);
     });
+
     btnBack.disabled = (step === 1);
     btnNext.disabled = (step === 3);
 
-    if (step === 1){
-      btnNext.disabled = !(preview && preview.values);
-    }
-    if (step === 2){
-      btnNext.disabled = (headerRowIndex === null || mpnColIndex === null || qtyColIndex === null);
-    }
-    if (step === 3){
-      btnNext.disabled = true;
-    }
+    if (step === 1) btnNext.disabled = !(preview && preview.values);
+    if (step === 2) btnNext.disabled = (headerRowIndex === null || mpnColIndex === null || qtyColIndex === null);
+    if (step === 3) btnNext.disabled = true;
+
+    postHeightToParent();
   }
   function openWizard(){
     backdrop.style.display = 'flex';
     backdrop.setAttribute('aria-hidden', 'false');
     lockBodyScroll(true);
     setActiveStep(1);
+    setTimeout(postHeightToParent, 50);
   }
   function closeWizardWithConfirm(){
     const ok = confirm("Do you really want to close?\nYour current progress will be kept only if you do not reset.\n(Upload token may expire later.)");
@@ -436,7 +432,10 @@
     backdrop.style.display = 'none';
     backdrop.setAttribute('aria-hidden', 'true');
     lockBodyScroll(false);
+    postHeightToParent();
   }
+
+  // A안 유지: 바깥 클릭/ESC로 닫히지 않음
   backdrop.addEventListener('click', (e) => { e.stopPropagation(); });
   document.addEventListener('keydown', (e) => {
     if (backdrop.style.display !== 'flex') return;
@@ -446,11 +445,14 @@
   btnOpenWizard.addEventListener('click', openWizard);
   btnCloseX.addEventListener('click', closeWizardWithConfirm);
 
-  btnBack.addEventListener('click', () => { if (currentStep > 1) setActiveStep(currentStep - 1); });
+  btnBack.addEventListener('click', () => {
+    if (currentStep > 1) setActiveStep(currentStep - 1);
+  });
   btnNext.addEventListener('click', () => {
     if (currentStep === 1){
       if (!(preview && preview.values)) { alert("Please upload and generate a preview first."); return; }
-      setActiveStep(2); return;
+      setActiveStep(2);
+      return;
     }
     if (currentStep === 2){
       if (headerRowIndex === null) { alert("Please select a header row."); return; }
@@ -469,6 +471,21 @@
     setActiveStep(1);
   });
 
+  btnHideGuide.addEventListener('click', () => {
+    const isHidden = guideBox.getAttribute('data-hidden') === '1';
+    if (!isHidden){
+      // hide details, keep header row
+      [...guideBox.children].forEach((el, idx) => { if (idx >= 1) el.style.display = 'none'; });
+      guideBox.setAttribute('data-hidden','1');
+      btnHideGuide.textContent = 'Show';
+    }else{
+      [...guideBox.children].forEach((el, idx) => { if (idx >= 1) el.style.display = ''; });
+      guideBox.setAttribute('data-hidden','0');
+      btnHideGuide.textContent = 'Hide';
+    }
+    postHeightToParent();
+  });
+
   function resetAll(){
     token = null;
     preview = null;
@@ -483,11 +500,14 @@
     statusEl.textContent = '';
     outEl.textContent = '{}';
     out2El.textContent = '{}';
+
     tableWrap.innerHTML = '';
     hScrollSpacer.style.width = '0px';
     hScrollTop.scrollLeft = 0;
+    tableWrap.scrollLeft = 0;
+    tableWrap.scrollTop = 0;
 
-    guideText.innerHTML = 'Guide: Click the <b>header row</b> in the table. (Click any cell to select the whole row)';
+    guideText.innerHTML = 'Guide: Click the <b>header row</b> in the table. (Click any cell to select the whole row)<br><span class="muted">Horizontal scroll: swipe left/right on the table (or use the top scroll bar).</span>';
     headerPickState.textContent = 'Header row: not selected';
 
     mpnSelect.innerHTML = '';
@@ -495,7 +515,6 @@
     mpnSelect.disabled = true;
     qtySelect.disabled = true;
 
-    chkAgg.checked = false;
     autoMapText.textContent = '-';
     mpnSamplesEl.textContent = '(no samples)';
     sampleWarn.style.display = 'none';
@@ -509,6 +528,7 @@
 
     setStage('idle');
     setGlobalStage('idle');
+    postHeightToParent();
   }
 
   function escapeHtml(s) {
@@ -523,10 +543,12 @@
   function renderTable(values) {
     const rowCount = values.length;
     const colCount = values[0] ? values[0].length : 0;
+
     let html = '<table><thead><tr>';
     html += '<th class="rowIndex">#</th>';
     for (let c = 0; c < colCount; c++) html += `<th>Col ${c+1}</th>`;
     html += '</tr></thead><tbody>';
+
     for (let r = 0; r < rowCount; r++) {
       html += `<tr data-r="${r}">`;
       html += `<td class="rowIndex">${r+1}</td>`;
@@ -542,13 +564,23 @@
 
     tableWrap.querySelectorAll('td.clickable').forEach(td => td.addEventListener('click', () => onAnyCellClick(td)));
 
+    // Resize h-scroll spacer to match real table width
     requestAnimationFrame(() => {
       const table = tableWrap.querySelector('table');
       if (table) hScrollSpacer.style.width = table.scrollWidth + 'px';
     });
 
-    tableWrap.addEventListener('scroll', () => { hScrollTop.scrollLeft = tableWrap.scrollLeft; }, { passive:true });
-    hScrollTop.addEventListener('scroll', () => { tableWrap.scrollLeft = hScrollTop.scrollLeft; }, { passive:true });
+    // Bind scroll sync once
+    if (!scrollBindOnce){
+      scrollBindOnce = true;
+      tableWrap.addEventListener('scroll', () => {
+        hScrollTop.scrollLeft = tableWrap.scrollLeft;
+      }, { passive:true });
+
+      hScrollTop.addEventListener('scroll', () => {
+        tableWrap.scrollLeft = hScrollTop.scrollLeft;
+      }, { passive:true });
+    }
   }
 
   function markSelectedHeaderRow(r) {
@@ -560,21 +592,40 @@
   function inferColsFromHeaderRow(headerRow) {
     const cells = (headerRow || []).map(v => (v===null||v===undefined) ? "" : String(v).trim());
     const lower = cells.map(s => s.toLowerCase());
-    const mpnPatterns = [/\bmpn\b/,/\bmanufacturer\s*part\s*number\b/,/\bmfr\s*part\s*number\b/,/\bpart\s*number\b/,/\bp\/n\b/,/\bpn\b/];
-    const qtyPatterns = [/\bqty\b/,/\bquantity\b/,/\border\s*qty\b/,/\bqty\./];
+
+    const mpnPatterns = [
+      /\bmpn\b/,
+      /\bmanufacturer\s*part\s*number\b/,
+      /\bmfr\s*part\s*number\b/,
+      /\bpart\s*number\b/,
+      /\bp\/n\b/,
+      /\bpn\b/
+    ];
+    const qtyPatterns = [
+      /\bqty\b/,
+      /\bquantity\b/,
+      /\border\s*qty\b/,
+      /\bqty\./
+    ];
+
     function find(patterns){
       for (let i=0;i<lower.length;i++){
         if (!lower[i]) continue;
-        for (const rx of patterns){ if (rx.test(lower[i])) return i; }
+        for (const rx of patterns){
+          if (rx.test(lower[i])) return i;
+        }
       }
       return null;
     }
+
     let mpn = find(mpnPatterns);
     let qty = find(qtyPatterns);
     if (mpn === null) {
-      for (let i=0;i<lower.length;i++){ if (/\bpart\b/.test(lower[i])) { mpn = i; break; } }
+      for (let i=0;i<lower.length;i++){
+        if (/\bpart\b/.test(lower[i])) { mpn = i; break; }
+      }
     }
-    return { mpnColIndex: mpn, qtyColIndex: qty };
+    return { mpnColIndex: mpn, qtyColIndex: qty, headerCells: cells };
   }
 
   function inferEffectiveDataStart(values, headerIdx, mpnC, qtyC){
@@ -613,6 +664,7 @@
     for (let c=0;c<colCount;c++){
       const label = headerCells && headerCells[c] ? headerCells[c] : '';
       const text = `Col ${c+1}${label ? ' - ' + label : ''}`;
+
       const o1 = document.createElement('option');
       o1.value = String(c);
       o1.textContent = text;
@@ -654,7 +706,7 @@
     if (blank) {
       sampleWarn.style.display = 'block';
       sampleWarn.textContent =
-        'Warning: First 5 MPN samples are blank. Data might start later. You can still convert, but you will be asked to confirm.';
+        'Warning: First 5 MPN samples are blank. Data might start later.\nYou can still convert, but please confirm before proceeding.';
       sampleOk.style.display = 'none';
     } else {
       sampleWarn.style.display = 'none';
@@ -663,18 +715,21 @@
     }
 
     btnNext.disabled = false;
+    postHeightToParent();
   }
 
   function onAnyCellClick(td) {
     if (!preview || !preview.values) return;
+
     const r = Number(td.getAttribute('data-r'));
     headerRowIndex = r;
-
     markSelectedHeaderRow(r);
+
     headerPickState.textContent = `Header row: ${headerRowIndex+1}`;
 
     const headerRow = preview.values[headerRowIndex] || [];
     const det = inferColsFromHeaderRow(headerRow);
+
     const colCount = (preview.values[0] ? preview.values[0].length : 0);
     const headerCells = headerRow.map(v => (v===null||v===undefined) ? "" : String(v).trim());
 
@@ -685,7 +740,7 @@
       qtyColIndex = Math.min(1, colCount-1);
       mpnSelect.value = String(mpnColIndex);
       qtySelect.value = String(qtyColIndex);
-      guideText.innerHTML = 'Guide: Header row selected ✅ Auto-detect failed → please set MPN/QTY via dropdown.';
+      guideText.innerHTML = 'Guide: Header row selected ✅ Auto-detect failed → please set MPN/QTY via dropdown.<br><span class="muted">Horizontal scroll: swipe left/right on the table (or use the top scroll bar).</span>';
       refreshMappingAndSamples();
       return;
     }
@@ -695,7 +750,7 @@
     mpnSelect.value = String(mpnColIndex);
     qtySelect.value = String(qtyColIndex);
 
-    guideText.innerHTML = 'Guide: Header row selected ✅ Auto-detected mapping applied. You can override via dropdown.';
+    guideText.innerHTML = 'Guide: Header row selected ✅ Auto-detected mapping applied. You can override via dropdown.<br><span class="muted">Horizontal scroll: swipe left/right on the table (or use the top scroll bar).</span>';
     refreshMappingAndSamples();
   }
 
@@ -727,13 +782,15 @@
     tableWrap.innerHTML = '';
     hScrollSpacer.style.width = '0px';
     hScrollTop.scrollLeft = 0;
+    tableWrap.scrollLeft = 0;
+    tableWrap.scrollTop = 0;
 
     mpnSelect.innerHTML = '';
     qtySelect.innerHTML = '';
     mpnSelect.disabled = true;
     qtySelect.disabled = true;
 
-    guideText.innerHTML = 'Guide: Click the <b>header row</b> in the table. (Click any cell to select the whole row)';
+    guideText.innerHTML = 'Guide: Click the <b>header row</b> in the table. (Click any cell to select the whole row)<br><span class="muted">Horizontal scroll: swipe left/right on the table (or use the top scroll bar).</span>';
     headerPickState.textContent = 'Header row: not selected';
     autoMapText.textContent = '-';
     mpnSamplesEl.textContent = '(no samples)';
@@ -772,6 +829,7 @@
             btnNext.disabled = true;
           }
           btnUpload.disabled = false;
+          postHeightToParent();
         })
         .withFailureHandler((err) => {
           outEl.textContent = String(err);
@@ -779,15 +837,16 @@
           setStage('error');
           btnUpload.disabled = false;
           btnNext.disabled = true;
+          postHeightToParent();
         })
         .uploadAndGetPreview({ filename: f.name, mimeType: f.type || '', dataUrl });
-
     } catch (e) {
       outEl.textContent = String(e);
       statusEl.textContent = 'Failed ❌ (file read error)';
       setStage('error');
       btnUpload.disabled = false;
       btnNext.disabled = true;
+      postHeightToParent();
     }
   });
 
@@ -804,19 +863,16 @@
   function buildReq() {
     return {
       token,
-      mapping: {
-        headerRowIndex,
-        mpnColIndex,
-        qtyColIndex,
-        aggregateSameMpn: chkAgg.checked
-      }
+      mapping: { headerRowIndex, mpnColIndex, qtyColIndex }
     };
   }
 
   function confirmIfSamplesBlank(){
     if (!lastMpnSamplesBlank) return true;
     return confirm(
-      "MPN sample 5 rows are all blank.\nData might start later.\n\nDo you want to continue conversion?"
+      "MPN sample 5 rows are all blank.\n" +
+      "Data might start later.\n\n" +
+      "Do you want to continue conversion?"
     );
   }
 
@@ -831,29 +887,28 @@
 
   function finishConvertUI(res){
     out2El.textContent = JSON.stringify(res, null, 2);
+
     if (res && res.ok && res.download && res.download.dataUrl) {
-      if (res.warnings && res.warnings.length) {
-        warningsEl.textContent = "Warnings:\n- " + res.warnings.join("\n- ");
-      } else {
-        warningsEl.textContent = "";
-      }
+      if (res.warnings && res.warnings.length) warningsEl.textContent = "Warnings:\n- " + res.warnings.join("\n- ");
+      else warningsEl.textContent = "";
+
       downloadLink.href = res.download.dataUrl;
       downloadLink.download = res.download.filename || 'output.xlsx';
       downloadLink.textContent = `Download ${downloadLink.download}`;
       downloadArea.style.display = 'block';
-      try {
-        triggerDownload(res.download.dataUrl, downloadLink.download);
-        convertStatus.textContent = 'Done ✅ (download triggered)';
-      } catch (e) {
-        convertStatus.textContent = 'Done ✅ (auto-download blocked; use link below)';
-      }
+
+      try { triggerDownload(res.download.dataUrl, downloadLink.download); convertStatus.textContent = 'Done ✅ (download triggered)'; }
+      catch (e) { convertStatus.textContent = 'Done ✅ (auto-download blocked; use link below)'; }
+
       setStage('done');
     } else {
       convertStatus.textContent = 'Failed ❌ (no download data)';
       setStage('error');
     }
+
     btnConvertMouser.disabled = false;
     btnConvertDigikey.disabled = false;
+    postHeightToParent();
   }
 
   function failConvertUI(err){
@@ -862,6 +917,7 @@
     setStage('error');
     btnConvertMouser.disabled = false;
     btnConvertDigikey.disabled = false;
+    postHeightToParent();
   }
 
   btnConvertMouser.addEventListener('click', () => {
@@ -869,6 +925,7 @@
     if (headerRowIndex === null) { alert('Please select a header row first.'); return; }
     if (mpnColIndex === null || qtyColIndex === null) { alert('Please select MPN/QTY columns.'); return; }
     if (!confirmIfSamplesBlank()) return;
+
     prepareConvertUI();
     google.script.run
       .withSuccessHandler((res) => finishConvertUI(res))
@@ -881,6 +938,7 @@
     if (headerRowIndex === null) { alert('Please select a header row first.'); return; }
     if (mpnColIndex === null || qtyColIndex === null) { alert('Please select MPN/QTY columns.'); return; }
     if (!confirmIfSamplesBlank()) return;
+
     prepareConvertUI();
     google.script.run
       .withSuccessHandler((res) => finishConvertUI(res))
@@ -888,8 +946,8 @@
       .convertToDigiKeyTemplate(buildReq());
   });
 
+  // init
   resetAll();
 </script>
-
 </body>
 </html>
