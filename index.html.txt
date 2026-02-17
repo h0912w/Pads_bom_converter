@@ -5,233 +5,497 @@
   <meta name="viewport" content="width=device-width,initial-scale=1" />
   <title>EDA BOM Converter (Mouser / Digi-Key)</title>
   <style>
+    :root{
+      --border:#e5e7eb;
+      --muted:#6b7280;
+      --text:#111827;
+      --bg:#ffffff;
+      --bg2:#f9fafb;
+      --btn:#111827;
+      --warn:#b45309;
+      --ok:#065f46;
+      --blue:#2563eb;
+    }
     body{
       font-family:system-ui,-apple-system,Segoe UI,Roboto,Arial,sans-serif;
       max-width:1100px;margin:18px auto;padding:0 14px;
+      color:var(--text);
     }
-    .card{border:1px solid #e5e7eb;border-radius:14px;padding:14px;margin:12px 0;background:#fff;}
-    button{padding:10px 14px;border:0;border-radius:12px;background:#111827;color:#fff;cursor:pointer;}
-    button:disabled{opacity:.5;cursor:not-allowed;}
-    pre{background:#f9fafb;border:1px solid #e5e7eb;border-radius:12px;padding:10px;overflow:auto;}
-    .muted{color:#6b7280;font-size:13px;}
+    .card{border:1px solid var(--border);border-radius:14px;padding:14px;margin:12px 0;background:var(--bg);}
     .row{display:flex;gap:10px;align-items:center;flex-wrap:wrap;}
-    .grid{display:grid;grid-template-columns: 1.35fr 0.85fr;gap:12px;align-items:start;}
-    .pill{display:inline-block;padding:4px 10px;border:1px solid #e5e7eb;border-radius:999px;font-size:12px;color:#111827;background:#f9fafb;}
-    .warn{color:#b45309;font-size:13px;white-space:pre-wrap;}
-    .ok{color:#065f46;font-size:13px;white-space:pre-wrap;}
-    .small{font-size:12px;color:#6b7280;}
-    code{background:#f3f4f6;padding:1px 6px;border-radius:6px;}
-
-    .tableWrap{
-      border:1px solid #e5e7eb;border-radius:14px;overflow:auto;max-height:560px;
-      position:relative;background:#fff;
+    .muted{color:var(--muted);font-size:13px;line-height:1.5;}
+    .pill{display:inline-block;padding:4px 10px;border:1px solid var(--border);border-radius:999px;font-size:12px;color:var(--text);background:var(--bg2);}
+    button{
+      padding:10px 14px;border:0;border-radius:12px;background:var(--btn);color:#fff;cursor:pointer;
     }
-    table{border-collapse:collapse;width:100%;min-width:920px;}
-    th, td{border-bottom:1px solid #f1f5f9;border-right:1px solid #f1f5f9;padding:6px 8px;font-size:13px;white-space:nowrap;}
-    th{position:sticky;top:0;background:#f9fafb;z-index:2;text-align:left;}
-    td{background:#fff;}
-    tr:hover td{background:#fcfcfd;}
-    .rowIndex{position:sticky;left:0;background:#f9fafb;z-index:3;font-weight:600;}
-    .cellIndex{color:#94a3b8;font-size:12px;}
+    button:disabled{opacity:.55;cursor:not-allowed;}
+    .btnSecondary{background:#fff;color:var(--text);border:1px solid var(--border);}
+    .btnGhost{background:var(--bg2);color:var(--text);border:1px solid var(--border);}
+    .btnDanger{background:#991b1b;}
+    .btnPrimary{background:var(--btn);}
+    pre{background:var(--bg2);border:1px solid var(--border);border-radius:12px;padding:10px;overflow:auto;max-height:220px;}
+    /* ===== Modal ===== */
+    .backdrop{
+      position:fixed; inset:0;
+      background:rgba(17,24,39,.55);
+      display:none; align-items:center; justify-content:center;
+      z-index:9999;
+      padding:14px;
+    }
+    .modal{
+      width:min(1160px, 98vw);
+      height:min(86vh, 860px);
+      background:#fff;
+      border-radius:16px;
+      border:1px solid rgba(255,255,255,.2);
+      box-shadow:0 30px 80px rgba(0,0,0,.35);
+      display:flex; flex-direction:column;
+      overflow:hidden;
+    }
+    .modalHeader{
+      display:flex; align-items:center; justify-content:space-between;
+      padding:12px 14px;
+      border-bottom:1px solid var(--border);
+      background:#fff;
+    }
+    .modalTitle{
+      display:flex;gap:10px;align-items:center;flex-wrap:wrap;
+    }
+    .modalTitle h2{margin:0;font-size:16px;}
+    .modalBody{
+      padding:14px;
+      flex:1;
+      overflow:hidden;
+      background:#fff;
+    }
+    .modalFooter{
+      padding:12px 14px;
+      border-top:1px solid var(--border);
+      background:#fff;
+      display:flex;align-items:center;justify-content:space-between;gap:10px;flex-wrap:wrap;
+    }
+    .closeX{
+      width:38px;height:38px;border-radius:12px;
+      display:inline-flex;align-items:center;justify-content:center;
+      background:#fff;border:1px solid var(--border);
+      cursor:pointer;font-size:18px;color:var(--text);
+    }
+    .closeX:hover{background:var(--bg2);}
+    .stepPane{display:none;height:100%;}
+    .stepPane.active{display:block;}
 
-    tr.headerSelected td{background:#e0f2fe !important;}
-    tr.headerSelected td.rowIndex{background:#bae6fd !important;}
-
-    td.clickable{cursor:pointer;}
-
-    .mapBox{
-      border:1px solid #e5e7eb;border-radius:14px;padding:12px;background:#fff;
-      position:sticky; top:12px;
+    .grid{
+      display:grid;
+      grid-template-columns: 1.35fr 0.85fr;
+      gap:12px;
+      height:100%;
+      min-height:0;
+    }
+    .leftPane, .rightPane{min-height:0;}
+    .rightPane{
+      border:1px solid var(--border);
+      border-radius:14px;
+      padding:12px;
+      background:#fff;
+      overflow:auto;
+      max-height:100%;
+      position:relative;
     }
 
-    select{
-      padding:8px 10px;border:1px solid #e5e7eb;border-radius:10px;background:#fff;
-      font-size:13px;color:#111827;
-      max-width:100%;
+    /* ✅ NEW: sticky mapping bar so MPN/QTY never “disappear” */
+    .stickyMapBar{
+      position:sticky;
+      top:0;
+      z-index:10;
+      background:#fff;
+      border:1px solid var(--border);
+      border-radius:12px;
+      padding:10px;
+      box-shadow:0 6px 18px rgba(0,0,0,.06);
     }
-    label{font-size:13px;color:#111827;}
-
-    .note{
-      font-size:12px;color:#6b7280;margin-top:8px;line-height:1.5;
-    }
-
-    .btnRow{display:flex;gap:10px;flex-wrap:wrap;margin-top:12px;}
-    .btnSecondary{
-      background:#ffffff;color:#111827;border:1px solid #e5e7eb;
+    .infoBox{
+      border:1px solid rgba(37,99,235,.35);
+      background:#eff6ff;
+      border-radius:12px;
+      padding:10px;
+      margin-top:10px;
+      color:#0f172a;
+      font-size:13px;
+      line-height:1.5;
     }
 
     .sectionTitle{
-      margin:0 0 8px;font-size:14px;color:#111827;
+      margin:0 0 8px;
+      font-size:14px;
     }
-
-    .divider{
-      border:0;border-top:1px solid #e5e7eb;margin:12px 0;
+    .divider{border:0;border-top:1px solid var(--border);margin:12px 0;}
+    select{
+      padding:8px 10px;border:1px solid var(--border);border-radius:10px;background:#fff;
+      font-size:13px;color:var(--text);max-width:100%;
+    }
+    label{font-size:13px;color:var(--text);}
+    .tableOuter{
+      border:1px solid var(--border);
+      border-radius:14px;
+      overflow:hidden;
+      background:#fff;
+      height:100%;
+      min-height:0;
+      display:flex;
+      flex-direction:column;
+    }
+    .hScrollTop{
+      height:16px;
+      overflow-x:auto;
+      overflow-y:hidden;
+      border-bottom:1px solid var(--border);
+      background:var(--bg2);
+    }
+    .hScrollSpacer{height:1px;}
+    .tableWrap{
+      position:relative;
+      overflow:auto;
+      flex:1;
+      min-height:0;
+      background:#fff;
+    }
+    table{border-collapse:collapse;width:100%;min-width:920px;}
+    th, td{border-bottom:1px solid #f1f5f9;border-right:1px solid #f1f5f9;padding:6px 8px;font-size:13px;white-space:nowrap;}
+    th{position:sticky;top:0;background:var(--bg2);z-index:2;text-align:left;}
+    td{background:#fff;}
+    tr:hover td{background:#fcfcfd;}
+    .rowIndex{position:sticky;left:0;background:var(--bg2);z-index:3;font-weight:600;}
+    td.clickable{cursor:pointer;}
+    tr.headerSelected td{background:#e0f2fe !important;}
+    tr.headerSelected td.rowIndex{background:#bae6fd !important;}
+    .warn{color:var(--warn);font-size:13px;white-space:pre-wrap;}
+    .ok{color:var(--ok);font-size:13px;white-space:pre-wrap;}
+    code{background:#f3f4f6;padding:1px 6px;border-radius:6px;}
+    .stepBadges{display:flex;gap:8px;align-items:center;flex-wrap:wrap;}
+    .badge{
+      padding:4px 10px;border:1px solid var(--border);border-radius:999px;
+      font-size:12px;background:var(--bg2);
+    }
+    .badge.active{
+      border-color:rgba(37,99,235,.5);
+      box-shadow:0 0 0 3px rgba(37,99,235,.12);
+      background:#eff6ff;
+    }
+    @media (max-width: 980px){
+      .modal{height:min(90vh, 920px);}
+      .grid{grid-template-columns:1fr;}
+      .rightPane{max-height:340px;}
+      table{min-width:880px;}
     }
   </style>
 </head>
+
 <body>
-  <h1>EDA BOM Converter (Mouser / Digi-Key)</h1>
-  <p class="muted">
-    Upload → Preview → Click <b>Header Row</b> → (Auto-detect + Dropdown override) → Convert & Download
+  <h1 style="margin:0 0 8px;">EDA BOM Converter (Mouser / Digi-Key)</h1>
+  <p class="muted" style="margin:0 0 12px;">
+    Upload BOM → Select header row → Auto-detect + dropdown override → Convert & download (.xlsx)
   </p>
 
-  <!-- Step 1: File upload -->
   <div class="card">
-    <h2 style="margin:0 0 10px;">1) Select file</h2>
-    <input id="file" type="file" accept=".csv,.txt,.tsv,.xls,.xlsx" />
-    <p class="muted" id="fileInfo"></p>
-
-    <div class="row" style="margin-top:10px;">
-      <button id="btnUpload">Upload & Preview</button>
-      <span class="muted" id="status"></span>
-      <span class="pill" id="stagePill">Stage: idle</span>
+    <h2 style="margin:0 0 10px;">Start</h2>
+    <p class="muted" style="margin:0 0 10px;">
+      Click the button below to open the guided converter (modal steps).
+      The page will not scroll while the modal is open.
+    </p>
+    <div class="row">
+      <button id="btnOpenWizard" class="btnPrimary">Open BOM Converter</button>
+      <span class="pill" id="globalStagePill">Stage: idle</span>
     </div>
   </div>
 
-  <!-- Step 2: Preview + Convert in ONE screen -->
-  <div class="card" id="previewCard" style="display:none;">
-    <h2 style="margin:0 0 10px;">2) Preview & Convert (one screen)</h2>
-    <p class="muted" id="guideText" style="margin:0 0 12px;">
-      Guide: Click the <b>header row</b> in the table. (Click any cell to select the whole row)
-    </p>
+  <div class="card">
+    <h2 style="margin:0 0 10px;">Notes</h2>
+    <ul class="muted" style="margin:0 0 0 18px;">
+      <li>This tool is EDA-agnostic (OrCAD / Altium / KiCad / PADS exports all supported).</li>
+      <li>Digi-Key output: Row 1 blank, header on Row 2, headers exactly <b>Manufacturer Product Number</b>, <b>Quantity</b>.</li>
+      <li>If MPN samples look blank, it may mean data starts later. You can still convert after confirmation.</li>
+    </ul>
+  </div>
 
-    <div class="grid">
-      <!-- Left: table -->
-      <div>
-        <div class="tableWrap" id="tableWrap"></div>
-
-        <h3 style="margin:14px 0 8px;">Server Response (debug)</h3>
-        <pre id="out">{}</pre>
+  <div class="backdrop" id="backdrop" aria-hidden="true">
+    <div class="modal" role="dialog" aria-modal="true" aria-labelledby="modalTitle">
+      <div class="modalHeader">
+        <div class="modalTitle">
+          <h2 id="modalTitle">BOM Converter</h2>
+          <div class="stepBadges" id="stepBadges">
+            <span class="badge active" data-step="1">Step 1: Upload</span>
+            <span class="badge" data-step="2">Step 2: Header & Mapping</span>
+            <span class="badge" data-step="3">Step 3: Convert</span>
+          </div>
+        </div>
+        <button class="closeX" id="btnCloseX" type="button" title="Close">×</button>
       </div>
 
-      <!-- Right: ALL actions -->
-      <div class="mapBox">
-        <div class="sectionTitle">Selection state</div>
-        <div class="small" id="headerPickState">Header row: not selected</div>
-        <div class="small" id="autoMapText" style="margin-top:8px;">-</div>
-
-        <div class="divider"></div>
-
-        <div class="sectionTitle">Column mapping</div>
-        <div class="row" style="margin-top:8px;">
-          <label for="mpnSelect"><b>MPN column</b></label>
-          <select id="mpnSelect" disabled></select>
-        </div>
-        <div class="row" style="margin-top:8px;">
-          <label for="qtySelect"><b>Quantity column</b></label>
-          <select id="qtySelect" disabled></select>
-        </div>
-
-        <div class="row" style="margin-top:10px;">
-          <label class="small"><input type="checkbox" id="chkAgg" /> Aggregate same MPN (sum Quantity)</label>
-        </div>
-
-        <div class="divider"></div>
-
-        <div class="sectionTitle">MPN sample check</div>
-        <div class="note">
-          Showing first 5 MPN values from the inferred data start row.
-          If they are all blank, you can still convert — you will be asked to confirm.
-        </div>
-        <pre id="mpnSamples" style="margin-top:10px;">(no samples)</pre>
-        <div id="sampleWarn" class="warn" style="margin-top:8px;display:none;"></div>
-        <div id="sampleOk" class="ok" style="margin-top:8px;display:none;"></div>
-
-        <div class="divider"></div>
-
-        <div class="sectionTitle">Convert & Download</div>
-        <div class="note">
-          <b>Digi-Key output:</b> Row 1 blank, header on Row 2, and headers must be exactly:
-          <b>Manufacturer Product Number</b>, <b>Quantity</b>.
+      <div class="modalBody">
+        <!-- STEP 1 -->
+        <div class="stepPane active" id="step1">
+          <div class="card" style="margin:0;">
+            <h3 style="margin:0 0 10px;">Upload & Preview</h3>
+            <input id="file" type="file" accept=".csv,.txt,.tsv,.xls,.xlsx" />
+            <p class="muted" id="fileInfo" style="margin:8px 0 0;"></p>
+            <div class="row" style="margin-top:12px;">
+              <button id="btnUpload">Upload & Preview</button>
+              <span class="muted" id="status"></span>
+              <span class="pill" id="stagePill">Stage: idle</span>
+            </div>
+            <div class="muted" style="margin-top:10px;">
+              Max file size: <code>8MB</code>
+            </div>
+          </div>
+          <div style="margin-top:12px;">
+            <h3 style="margin:0 0 8px;">Server Response (debug)</h3>
+            <pre id="out">{}</pre>
+          </div>
         </div>
 
-        <div class="btnRow">
-          <button id="btnConvertMouser" disabled>Convert & Download (Mouser .xlsx)</button>
-          <button id="btnConvertDigikey" disabled>Convert & Download (Digi-Key .xlsx)</button>
+        <!-- STEP 2 -->
+        <div class="stepPane" id="step2">
+          <div class="grid">
+            <div class="leftPane">
+              <div class="tableOuter">
+                <div class="hScrollTop" id="hScrollTop"><div class="hScrollSpacer" id="hScrollSpacer"></div></div>
+                <div class="tableWrap" id="tableWrap"></div>
+              </div>
+              <p class="muted" id="guideText" style="margin:10px 2px 0;">
+                Guide: Click the <b>header row</b> in the table. (Click any cell to select the whole row)
+              </p>
+            </div>
+
+            <div class="rightPane">
+              <!-- ✅ NEW: Sticky mapping bar (always visible) -->
+              <div class="stickyMapBar">
+                <h3 class="sectionTitle" style="margin-bottom:6px;">Header row selection (required)</h3>
+                <div class="muted" id="headerPickState">Header row: not selected</div>
+
+                <div class="infoBox">
+                  <b>How to select the header row:</b><br>
+                  Click the row that contains column names such as <code>MPN</code>, <code>Part Number</code>, <code>Qty</code>, <code>Quantity</code>.<br>
+                  After you click a row, the tool will auto-detect <b>MPN (Part Number)</b> and <b>Quantity</b> columns.<br>
+                  If auto-detection is wrong, use the dropdowns below to override.
+                </div>
+
+                <div class="divider"></div>
+
+                <h3 class="sectionTitle">Column mapping (auto + dropdown override)</h3>
+                <div class="row" style="margin-top:8px;">
+                  <label for="mpnSelect"><b>MPN (Part Number) column</b></label>
+                  <select id="mpnSelect" disabled></select>
+                </div>
+                <div class="row" style="margin-top:8px;">
+                  <label for="qtySelect"><b>Quantity column</b></label>
+                  <select id="qtySelect" disabled></select>
+                </div>
+                <div class="row" style="margin-top:10px;">
+                  <label class="muted"><input type="checkbox" id="chkAgg" /> Aggregate same MPN (sum Quantity)</label>
+                </div>
+              </div>
+
+              <div class="divider"></div>
+
+              <h3 class="sectionTitle">Data start row + MPN samples</h3>
+              <div class="muted" id="autoMapText">-</div>
+              <pre id="mpnSamples" style="margin-top:10px;">(no samples)</pre>
+              <div id="sampleWarn" class="warn" style="margin-top:8px;display:none;"></div>
+              <div id="sampleOk" class="ok" style="margin-top:8px;display:none;"></div>
+            </div>
+          </div>
         </div>
 
-        <div class="muted" id="convertStatus" style="margin-top:10px;"></div>
-        <div id="warnings" class="warn" style="margin-top:10px;"></div>
-
-        <div id="downloadArea" style="display:none;margin-top:10px;">
-          <p class="muted" style="margin:0;">If auto-download is blocked, click below.</p>
-          <a id="downloadLink" href="#" download="">Download output.xlsx</a>
+        <!-- STEP 3 -->
+        <div class="stepPane" id="step3">
+          <div class="card" style="margin:0;">
+            <h3 style="margin:0 0 10px;">Convert & Download</h3>
+            <p class="muted" style="margin:0 0 10px;">
+              You can convert to either template:
+              <br>
+              <b>Mouser:</b> fills <code>Mfr Part Number (Input)</code> and <code>Quantity 1</code>.
+              <br>
+              <b>Digi-Key:</b> Row 1 blank, header on Row 2, headers exactly:
+              <code>Manufacturer Product Number</code>, <code>Quantity</code>.
+            </p>
+            <div class="row" style="margin-top:10px;">
+              <button id="btnConvertMouser" disabled>Convert & Download (Mouser .xlsx)</button>
+              <button id="btnConvertDigikey" disabled>Convert & Download (Digi-Key .xlsx)</button>
+            </div>
+            <div class="muted" id="convertStatus" style="margin-top:10px;"></div>
+            <div id="warnings" class="warn" style="margin-top:10px;"></div>
+            <div id="downloadArea" style="display:none;margin-top:10px;">
+              <p class="muted" style="margin:0;">If auto-download is blocked, click below.</p>
+              <a id="downloadLink" href="#" download="">Download output.xlsx</a>
+            </div>
+          </div>
+          <div style="margin-top:12px;">
+            <h3 style="margin:0 0 8px;">Server Response (debug)</h3>
+            <pre id="out2">{}</pre>
+          </div>
         </div>
-
-        <div class="divider"></div>
-
-        <button class="btnSecondary" id="btnReset" type="button">Reset</button>
       </div>
+
+      <div class="modalFooter">
+        <div class="row">
+          <button id="btnBack" class="btnSecondary" type="button">Back</button>
+          <button id="btnNext" class="btnPrimary" type="button">Next</button>
+        </div>
+        <div class="row">
+          <button id="btnResetAll" class="btnGhost" type="button">Reset</button>
+        </div>
+      </div>
+
     </div>
   </div>
 
 <script>
-  // DOM
+  // ===== DOM =====
+  const btnOpenWizard = document.getElementById('btnOpenWizard');
+  const globalStagePill = document.getElementById('globalStagePill');
+  const backdrop = document.getElementById('backdrop');
+  const btnCloseX = document.getElementById('btnCloseX');
+  const stepBadges = document.getElementById('stepBadges');
+  const step1 = document.getElementById('step1');
+  const step2 = document.getElementById('step2');
+  const step3 = document.getElementById('step3');
+  const btnBack = document.getElementById('btnBack');
+  const btnNext = document.getElementById('btnNext');
+  const btnResetAll = document.getElementById('btnResetAll');
   const fileEl = document.getElementById('file');
   const fileInfoEl = document.getElementById('fileInfo');
   const btnUpload = document.getElementById('btnUpload');
   const statusEl = document.getElementById('status');
   const stagePill = document.getElementById('stagePill');
-
-  const previewCard = document.getElementById('previewCard');
-  const tableWrap = document.getElementById('tableWrap');
   const outEl = document.getElementById('out');
-
+  const out2El = document.getElementById('out2');
+  const tableWrap = document.getElementById('tableWrap');
   const guideText = document.getElementById('guideText');
   const headerPickState = document.getElementById('headerPickState');
-  const autoMapText = document.getElementById('autoMapText');
-
-  const chkAgg = document.getElementById('chkAgg');
-
+  const hScrollTop = document.getElementById('hScrollTop');
+  const hScrollSpacer = document.getElementById('hScrollSpacer');
   const mpnSelect = document.getElementById('mpnSelect');
   const qtySelect = document.getElementById('qtySelect');
-
+  const chkAgg = document.getElementById('chkAgg');
+  const autoMapText = document.getElementById('autoMapText');
   const mpnSamplesEl = document.getElementById('mpnSamples');
   const sampleWarn = document.getElementById('sampleWarn');
   const sampleOk = document.getElementById('sampleOk');
-
   const btnConvertMouser = document.getElementById('btnConvertMouser');
   const btnConvertDigikey = document.getElementById('btnConvertDigikey');
   const convertStatus = document.getElementById('convertStatus');
   const warningsEl = document.getElementById('warnings');
   const downloadArea = document.getElementById('downloadArea');
   const downloadLink = document.getElementById('downloadLink');
-
-  const btnReset = document.getElementById('btnReset');
-
   const MAX_BYTES = 8 * 1024 * 1024;
 
-  // State
+  // ===== State =====
+  let currentStep = 1;
   let token = null;
   let preview = null;
   let headerRowIndex = null;
-
   let mpnColIndex = null;
   let qtyColIndex = null;
   let effectiveDataStartRowIndex = null;
-
   let lastMpnSamplesBlank = false;
 
-  function setStage(s){ stagePill.textContent = `Stage: ${s}`; }
+  function setGlobalStage(s){ globalStagePill.textContent = `Stage: ${s}`; }
+  function setStage(s){ stagePill.textContent = `Stage: ${s}`; setGlobalStage(s); }
+  function lockBodyScroll(lock){
+    document.body.style.overflow = lock ? 'hidden' : '';
+  }
+  function setActiveStep(step){
+    currentStep = step;
+    [step1, step2, step3].forEach(el => el.classList.remove('active'));
+    document.getElementById(`step${step}`).classList.add('active');
+    [...stepBadges.querySelectorAll('.badge')].forEach(b => {
+      b.classList.toggle('active', Number(b.getAttribute('data-step')) === step);
+    });
+    btnBack.disabled = (step === 1);
+    btnNext.disabled = (step === 3);
 
-  function resetAll() {
+    if (step === 1){
+      btnNext.disabled = !(preview && preview.values);
+    }
+    if (step === 2){
+      btnNext.disabled = (headerRowIndex === null || mpnColIndex === null || qtyColIndex === null);
+    }
+    if (step === 3){
+      btnNext.disabled = true;
+    }
+  }
+  function openWizard(){
+    backdrop.style.display = 'flex';
+    backdrop.setAttribute('aria-hidden', 'false');
+    lockBodyScroll(true);
+    setActiveStep(1);
+  }
+  function closeWizardWithConfirm(){
+    const ok = confirm("Do you really want to close?\nYour current progress will be kept only if you do not reset.\n(Upload token may expire later.)");
+    if (!ok) return;
+    backdrop.style.display = 'none';
+    backdrop.setAttribute('aria-hidden', 'true');
+    lockBodyScroll(false);
+  }
+  backdrop.addEventListener('click', (e) => { e.stopPropagation(); });
+  document.addEventListener('keydown', (e) => {
+    if (backdrop.style.display !== 'flex') return;
+    if (e.key === 'Escape') e.preventDefault();
+  });
+
+  btnOpenWizard.addEventListener('click', openWizard);
+  btnCloseX.addEventListener('click', closeWizardWithConfirm);
+
+  btnBack.addEventListener('click', () => { if (currentStep > 1) setActiveStep(currentStep - 1); });
+  btnNext.addEventListener('click', () => {
+    if (currentStep === 1){
+      if (!(preview && preview.values)) { alert("Please upload and generate a preview first."); return; }
+      setActiveStep(2); return;
+    }
+    if (currentStep === 2){
+      if (headerRowIndex === null) { alert("Please select a header row."); return; }
+      if (mpnColIndex === null || qtyColIndex === null) { alert("Please select MPN/QTY columns."); return; }
+      setActiveStep(3);
+      btnConvertMouser.disabled = false;
+      btnConvertDigikey.disabled = false;
+      return;
+    }
+  });
+
+  btnResetAll.addEventListener('click', () => {
+    const ok = confirm("Reset all current work? (uploaded preview & selections will be cleared)");
+    if (!ok) return;
+    resetAll();
+    setActiveStep(1);
+  });
+
+  function resetAll(){
     token = null;
     preview = null;
     headerRowIndex = null;
-
     mpnColIndex = null;
     qtyColIndex = null;
     effectiveDataStartRowIndex = null;
-
     lastMpnSamplesBlank = false;
 
-    tableWrap.innerHTML = '';
+    fileEl.value = '';
+    fileInfoEl.textContent = '';
+    statusEl.textContent = '';
     outEl.textContent = '{}';
-    warningsEl.textContent = '';
-    downloadArea.style.display = 'none';
-    convertStatus.textContent = '';
+    out2El.textContent = '{}';
+    tableWrap.innerHTML = '';
+    hScrollSpacer.style.width = '0px';
+    hScrollTop.scrollLeft = 0;
 
+    guideText.innerHTML = 'Guide: Click the <b>header row</b> in the table. (Click any cell to select the whole row)';
     headerPickState.textContent = 'Header row: not selected';
+
+    mpnSelect.innerHTML = '';
+    qtySelect.innerHTML = '';
+    mpnSelect.disabled = true;
+    qtySelect.disabled = true;
+
+    chkAgg.checked = false;
     autoMapText.textContent = '-';
     mpnSamplesEl.textContent = '(no samples)';
     sampleWarn.style.display = 'none';
@@ -239,33 +503,13 @@
 
     btnConvertMouser.disabled = true;
     btnConvertDigikey.disabled = true;
+    convertStatus.textContent = '';
+    warningsEl.textContent = '';
+    downloadArea.style.display = 'none';
 
-    mpnSelect.innerHTML = '';
-    qtySelect.innerHTML = '';
-    mpnSelect.disabled = true;
-    qtySelect.disabled = true;
-
-    guideText.innerHTML = 'Guide: Click the <b>header row</b> in the table. (Click any cell to select the whole row)';
     setStage('idle');
+    setGlobalStage('idle');
   }
-
-  btnReset.addEventListener('click', () => {
-    resetAll();
-    previewCard.style.display = 'none';
-    statusEl.textContent = '';
-    fileEl.value = '';
-    fileInfoEl.textContent = '';
-  });
-
-  fileEl.addEventListener('change', () => {
-    const f = fileEl.files && fileEl.files[0];
-    resetAll();
-    previewCard.style.display = 'none';
-    statusEl.textContent = '';
-    if (!f) { fileInfoEl.textContent = ''; return; }
-    fileInfoEl.textContent = `Selected: ${f.name} (${f.type || 'unknown'}) / ${f.size} bytes`;
-    if (f.size > MAX_BYTES) statusEl.textContent = `File too large (limit ${MAX_BYTES} bytes).`;
-  });
 
   function escapeHtml(s) {
     return String(s)
@@ -279,14 +523,10 @@
   function renderTable(values) {
     const rowCount = values.length;
     const colCount = values[0] ? values[0].length : 0;
-
     let html = '<table><thead><tr>';
     html += '<th class="rowIndex">#</th>';
-    for (let c = 0; c < colCount; c++) {
-      html += `<th>Col ${c+1}<div class="cellIndex">${String.fromCharCode(65 + (c % 26))}</div></th>`;
-    }
+    for (let c = 0; c < colCount; c++) html += `<th>Col ${c+1}</th>`;
     html += '</tr></thead><tbody>';
-
     for (let r = 0; r < rowCount; r++) {
       html += `<tr data-r="${r}">`;
       html += `<td class="rowIndex">${r+1}</td>`;
@@ -298,9 +538,17 @@
       html += '</tr>';
     }
     html += '</tbody></table>';
-
     tableWrap.innerHTML = html;
+
     tableWrap.querySelectorAll('td.clickable').forEach(td => td.addEventListener('click', () => onAnyCellClick(td)));
+
+    requestAnimationFrame(() => {
+      const table = tableWrap.querySelector('table');
+      if (table) hScrollSpacer.style.width = table.scrollWidth + 'px';
+    });
+
+    tableWrap.addEventListener('scroll', () => { hScrollTop.scrollLeft = tableWrap.scrollLeft; }, { passive:true });
+    hScrollTop.addEventListener('scroll', () => { tableWrap.scrollLeft = hScrollTop.scrollLeft; }, { passive:true });
   }
 
   function markSelectedHeaderRow(r) {
@@ -312,48 +560,21 @@
   function inferColsFromHeaderRow(headerRow) {
     const cells = (headerRow || []).map(v => (v===null||v===undefined) ? "" : String(v).trim());
     const lower = cells.map(s => s.toLowerCase());
-
-    const mpnPatterns = [
-      /\bmpn\b/,
-      /\bmanufacturer\s*part\s*number\b/,
-      /\bmfr\s*part\s*number\b/,
-      /\bmanuf(acter|)\s*p\/n\b/,
-      /\bpart\s*number\b/,
-      /\bp\/n\b/,
-      /\bpn\b/
-    ];
-    const qtyPatterns = [
-      /\bqty\b/,
-      /\bquantity\b/,
-      /\border\s*qty\b/,
-      /\bqty\./
-    ];
-
+    const mpnPatterns = [/\bmpn\b/,/\bmanufacturer\s*part\s*number\b/,/\bmfr\s*part\s*number\b/,/\bpart\s*number\b/,/\bp\/n\b/,/\bpn\b/];
+    const qtyPatterns = [/\bqty\b/,/\bquantity\b/,/\border\s*qty\b/,/\bqty\./];
     function find(patterns){
       for (let i=0;i<lower.length;i++){
         if (!lower[i]) continue;
-        for (const rx of patterns){
-          if (rx.test(lower[i])) return i;
-        }
+        for (const rx of patterns){ if (rx.test(lower[i])) return i; }
       }
       return null;
     }
-
     let mpn = find(mpnPatterns);
     let qty = find(qtyPatterns);
-
     if (mpn === null) {
-      for (let i=0;i<lower.length;i++){
-        if (/\bpart\b/.test(lower[i])) { mpn = i; break; }
-      }
+      for (let i=0;i<lower.length;i++){ if (/\bpart\b/.test(lower[i])) { mpn = i; break; } }
     }
-    if (qty === null) {
-      for (let i=0;i<lower.length;i++){
-        if (lower[i] === 'q' || lower[i] === 'qty') { qty = i; break; }
-      }
-    }
-
-    return { mpnColIndex: mpn, qtyColIndex: qty, headerCells: cells };
+    return { mpnColIndex: mpn, qtyColIndex: qty };
   }
 
   function inferEffectiveDataStart(values, headerIdx, mpnC, qtyC){
@@ -389,11 +610,9 @@
   function fillDropdowns(colCount, headerCells){
     mpnSelect.innerHTML = '';
     qtySelect.innerHTML = '';
-
     for (let c=0;c<colCount;c++){
       const label = headerCells && headerCells[c] ? headerCells[c] : '';
       const text = `Col ${c+1}${label ? ' - ' + label : ''}`;
-
       const o1 = document.createElement('option');
       o1.value = String(c);
       o1.textContent = text;
@@ -404,7 +623,6 @@
       o2.textContent = text;
       qtySelect.appendChild(o2);
     }
-
     mpnSelect.disabled = false;
     qtySelect.disabled = false;
   }
@@ -415,7 +633,6 @@
     if (mpnColIndex === null || qtyColIndex === null) return;
 
     const values = preview.values;
-
     effectiveDataStartRowIndex = inferEffectiveDataStart(values, headerRowIndex, mpnColIndex, qtyColIndex);
 
     const headerRow = values[headerRowIndex] || [];
@@ -437,24 +654,19 @@
     if (blank) {
       sampleWarn.style.display = 'block';
       sampleWarn.textContent =
-        'Warning: First 5 MPN samples are blank. Data might start later (e.g., from 6th row). You can still convert, but you will be asked to confirm.';
+        'Warning: First 5 MPN samples are blank. Data might start later. You can still convert, but you will be asked to confirm.';
       sampleOk.style.display = 'none';
     } else {
       sampleWarn.style.display = 'none';
       sampleOk.style.display = 'block';
-      sampleOk.textContent = 'MPN samples detected. You can convert.';
+      sampleOk.textContent = 'MPN samples detected. You can proceed.';
     }
 
-    // Header selected => Convert buttons enabled (not disabled by sample)
-    btnConvertMouser.disabled = false;
-    btnConvertDigikey.disabled = false;
-
-    setStage('ready');
+    btnNext.disabled = false;
   }
 
   function onAnyCellClick(td) {
     if (!preview || !preview.values) return;
-
     const r = Number(td.getAttribute('data-r'));
     headerRowIndex = r;
 
@@ -463,18 +675,16 @@
 
     const headerRow = preview.values[headerRowIndex] || [];
     const det = inferColsFromHeaderRow(headerRow);
-
     const colCount = (preview.values[0] ? preview.values[0].length : 0);
     const headerCells = headerRow.map(v => (v===null||v===undefined) ? "" : String(v).trim());
+
     fillDropdowns(colCount, headerCells);
 
     if (det.mpnColIndex === null || det.qtyColIndex === null) {
       mpnColIndex = 0;
       qtyColIndex = Math.min(1, colCount-1);
-
       mpnSelect.value = String(mpnColIndex);
       qtySelect.value = String(qtyColIndex);
-
       guideText.innerHTML = 'Guide: Header row selected ✅ Auto-detect failed → please set MPN/QTY via dropdown.';
       refreshMappingAndSamples();
       return;
@@ -482,7 +692,6 @@
 
     mpnColIndex = det.mpnColIndex;
     qtyColIndex = det.qtyColIndex;
-
     mpnSelect.value = String(mpnColIndex);
     qtySelect.value = String(qtyColIndex);
 
@@ -490,23 +699,48 @@
     refreshMappingAndSamples();
   }
 
-  mpnSelect.addEventListener('change', () => {
-    mpnColIndex = Number(mpnSelect.value);
-    refreshMappingAndSamples();
-  });
-  qtySelect.addEventListener('change', () => {
-    qtyColIndex = Number(qtySelect.value);
-    refreshMappingAndSamples();
+  mpnSelect.addEventListener('change', () => { mpnColIndex = Number(mpnSelect.value); refreshMappingAndSamples(); });
+  qtySelect.addEventListener('change', () => { qtyColIndex = Number(qtySelect.value); refreshMappingAndSamples(); });
+
+  // ===== Upload =====
+  fileEl.addEventListener('change', () => {
+    const f = fileEl.files && fileEl.files[0];
+    statusEl.textContent = '';
+    if (!f) { fileInfoEl.textContent = ''; return; }
+    fileInfoEl.textContent = `Selected: ${f.name} (${f.type || 'unknown'}) / ${f.size} bytes`;
+    if (f.size > MAX_BYTES) statusEl.textContent = `File too large (limit ${MAX_BYTES} bytes).`;
   });
 
-  // Upload
   btnUpload.addEventListener('click', async () => {
     const f = fileEl.files && fileEl.files[0];
     if (!f) { alert('Please select a file first.'); return; }
     if (f.size > MAX_BYTES) { alert('File is too large (8MB limit).'); return; }
 
-    resetAll();
-    previewCard.style.display = 'block';
+    token = null;
+    preview = null;
+    headerRowIndex = null;
+    mpnColIndex = null;
+    qtyColIndex = null;
+    effectiveDataStartRowIndex = null;
+    lastMpnSamplesBlank = false;
+
+    tableWrap.innerHTML = '';
+    hScrollSpacer.style.width = '0px';
+    hScrollTop.scrollLeft = 0;
+
+    mpnSelect.innerHTML = '';
+    qtySelect.innerHTML = '';
+    mpnSelect.disabled = true;
+    qtySelect.disabled = true;
+
+    guideText.innerHTML = 'Guide: Click the <b>header row</b> in the table. (Click any cell to select the whole row)';
+    headerPickState.textContent = 'Header row: not selected';
+    autoMapText.textContent = '-';
+    mpnSamplesEl.textContent = '(no samples)';
+    sampleWarn.style.display = 'none';
+    sampleOk.style.display = 'none';
+    btnNext.disabled = true;
+
     btnUpload.disabled = true;
     statusEl.textContent = 'Reading file...';
     setStage('reading');
@@ -525,21 +759,18 @@
       google.script.run
         .withSuccessHandler((res) => {
           outEl.textContent = JSON.stringify(res, null, 2);
-
           if (res && res.ok && res.preview && res.preview.values) {
             token = res.token;
             preview = res.preview;
-
             renderTable(preview.values);
-
             statusEl.textContent = 'Preview ready ✅';
-            guideText.innerHTML = 'Guide: Click the <b>header row</b> in the table. (Click any cell to select the whole row)';
             setStage('preview');
+            btnNext.disabled = false;
           } else {
             statusEl.textContent = 'Failed ❌ (no preview)';
             setStage('error');
+            btnNext.disabled = true;
           }
-
           btnUpload.disabled = false;
         })
         .withFailureHandler((err) => {
@@ -547,16 +778,20 @@
           statusEl.textContent = 'Failed ❌ (script error)';
           setStage('error');
           btnUpload.disabled = false;
+          btnNext.disabled = true;
         })
         .uploadAndGetPreview({ filename: f.name, mimeType: f.type || '', dataUrl });
+
     } catch (e) {
       outEl.textContent = String(e);
       statusEl.textContent = 'Failed ❌ (file read error)';
       setStage('error');
       btnUpload.disabled = false;
+      btnNext.disabled = true;
     }
   });
 
+  // ===== Convert =====
   function triggerDownload(dataUrl, filename) {
     const a = document.createElement('a');
     a.href = dataUrl;
@@ -567,7 +802,6 @@
   }
 
   function buildReq() {
-    if (headerRowIndex === null) return null;
     return {
       token,
       mapping: {
@@ -579,7 +813,14 @@
     };
   }
 
-  function prepareConvertUI() {
+  function confirmIfSamplesBlank(){
+    if (!lastMpnSamplesBlank) return true;
+    return confirm(
+      "MPN sample 5 rows are all blank.\nData might start later.\n\nDo you want to continue conversion?"
+    );
+  }
+
+  function prepareConvertUI(){
     btnConvertMouser.disabled = true;
     btnConvertDigikey.disabled = true;
     convertStatus.textContent = 'Converting...';
@@ -588,62 +829,46 @@
     setStage('converting');
   }
 
-  function finishConvertUI(res) {
-    outEl.textContent = JSON.stringify(res, null, 2);
-
+  function finishConvertUI(res){
+    out2El.textContent = JSON.stringify(res, null, 2);
     if (res && res.ok && res.download && res.download.dataUrl) {
       if (res.warnings && res.warnings.length) {
         warningsEl.textContent = "Warnings:\n- " + res.warnings.join("\n- ");
       } else {
         warningsEl.textContent = "";
       }
-
       downloadLink.href = res.download.dataUrl;
       downloadLink.download = res.download.filename || 'output.xlsx';
       downloadLink.textContent = `Download ${downloadLink.download}`;
       downloadArea.style.display = 'block';
-
       try {
         triggerDownload(res.download.dataUrl, downloadLink.download);
-        convertStatus.textContent = `Done ✅ (download triggered)`;
+        convertStatus.textContent = 'Done ✅ (download triggered)';
       } catch (e) {
         convertStatus.textContent = 'Done ✅ (auto-download blocked; use link below)';
       }
-
       setStage('done');
     } else {
       convertStatus.textContent = 'Failed ❌ (no download data)';
       setStage('error');
     }
-
-    // Re-enable (header chosen)
-    btnConvertMouser.disabled = (headerRowIndex === null);
-    btnConvertDigikey.disabled = (headerRowIndex === null);
+    btnConvertMouser.disabled = false;
+    btnConvertDigikey.disabled = false;
   }
 
-  function failConvertUI(err) {
-    outEl.textContent = String(err);
+  function failConvertUI(err){
+    out2El.textContent = String(err);
     convertStatus.textContent = 'Failed ❌ (script error)';
     setStage('error');
-
-    btnConvertMouser.disabled = (headerRowIndex === null);
-    btnConvertDigikey.disabled = (headerRowIndex === null);
-  }
-
-  function confirmIfSamplesBlank(){
-    if (!lastMpnSamplesBlank) return true;
-    return confirm(
-      "MPN sample 5 rows are all blank.\n" +
-      "Data might start later (e.g., from 6th row).\n\n" +
-      "Do you want to continue conversion?"
-    );
+    btnConvertMouser.disabled = false;
+    btnConvertDigikey.disabled = false;
   }
 
   btnConvertMouser.addEventListener('click', () => {
     if (!token || !token.sheetId) { alert('Please upload first.'); return; }
     if (headerRowIndex === null) { alert('Please select a header row first.'); return; }
+    if (mpnColIndex === null || qtyColIndex === null) { alert('Please select MPN/QTY columns.'); return; }
     if (!confirmIfSamplesBlank()) return;
-
     prepareConvertUI();
     google.script.run
       .withSuccessHandler((res) => finishConvertUI(res))
@@ -654,8 +879,8 @@
   btnConvertDigikey.addEventListener('click', () => {
     if (!token || !token.sheetId) { alert('Please upload first.'); return; }
     if (headerRowIndex === null) { alert('Please select a header row first.'); return; }
+    if (mpnColIndex === null || qtyColIndex === null) { alert('Please select MPN/QTY columns.'); return; }
     if (!confirmIfSamplesBlank()) return;
-
     prepareConvertUI();
     google.script.run
       .withSuccessHandler((res) => finishConvertUI(res))
@@ -665,5 +890,6 @@
 
   resetAll();
 </script>
+
 </body>
 </html>
