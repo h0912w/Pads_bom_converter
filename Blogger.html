@@ -1,91 +1,75 @@
-<!--VERSION: 31-->
+<!--VERSION: 35-->
 
-<section id="eda-bom-converter" style="border-radius: 14px; border: 1px solid rgb(229, 231, 235); font-family: system-ui, -apple-system, &quot;Segoe UI&quot;, Roboto, Arial, sans-serif; margin: 20px auto; max-width: 1040px; padding: 20px;">
+<section id="eda-bom-converter" style="border-radius: 14px; border: 1px solid rgb(229, 231, 235); font-family: system-ui, -apple-system, &quot;Segoe UI&quot;, Roboto, Arial, sans-serif; max-width: 1040px; margin: 18px auto; padding: 16px;">
+  <h1 style="margin: 0 0 8px 0; font-size: 22px;">PADS BOM Converter for Digi-Key and Mouser</h1>
 
-  <h1 style="margin: 0px 0px 8px;">EDA BOM Converter for Digi-Key and Mouser (OrCAD, Altium, KiCad, PADS)</h1>
-
-  <p style="color: #374151; line-height: 1.6; margin: 0px 0px 12px;">
-    Convert BOM files exported from <strong>OrCAD, Altium, KiCad, and PADS</strong> into distributor upload-ready templates.
-    This converter is <strong>EDA-agnostic</strong>: you do <strong>not</strong> need to choose which EDA tool generated your BOM.
-    Upload a BOM, select the <strong>header row</strong>, optionally adjust <strong>MPN / Quantity</strong>, then download
-    <strong>Mouser</strong> or <strong>Digi-Key</strong> formatted <strong>.xlsx</strong>.
+  <p style="margin: 0 0 10px 0; color: #374151;">
+    <strong>Status:</strong> Active (MVP). Supports <strong>Upload → Preview → Header selection → Auto-detect + dropdown override → Convert</strong>.
   </p>
 
-  <div style="background: rgb(249, 250, 251); border-radius: 12px; border: 1px solid rgb(229, 231, 235); margin: 12px 0px; padding: 12px;">
-    <p style="color: #111827; line-height: 1.6; margin: 0px;">
-      <strong>Status:</strong> Active (MVP). Supports <strong>Upload → Preview → Header selection → Auto-detect + dropdown override → Convert</strong>.
-      The converter UI runs as a <strong>guided modal (popup)</strong> so you do not need to scroll the page to find the next step.
-    </p>
-    <p style="color: #6b7280; font-size: 13px; line-height: 1.6; margin: 6px 0px 0px;">
-      Note: This tool runs on Google Apps Script. A Google permission screen may appear on first use.
-    </p>
-  </div>
-
-  <hr style="border-bottom: 0px; border-image: initial; border-left: 0px; border-right: 0px; border-top: 1px solid rgb(229, 231, 235); border: 0; margin: 18px 0px;" />
-
-  <h2 style="margin: 18px 0px 10px;">BOM Upload &amp; Convert Tool</h2>
-
-  <div style="background: rgb(255, 255, 255); border-radius: 14px; border: 1px solid rgb(229, 231, 235); overflow: hidden;">
-    <iframe id="edaBomIframe" loading="lazy" referrerpolicy="no-referrer-when-downgrade" src="https://script.google.com/macros/s/AKfycbwI4JgYB5Jhji1fP0qisUwJgVrf8pC3SpnT2jb6MnaVh-q92-nZI1CezC9lFtKX-00IIA/exec" style="border: 0; display: block; height: 1100px; min-height: 900px; width: 100%;" title="EDA BOM Converter (Apps Script Web App)"></iframe>
-  </div>
-
-  <p style="color: #6b7280; font-size: 13px; line-height: 1.6; margin: 10px 0px 0px;">
-    If the embedded tool does not load, open it directly:
-    <a href="https://script.google.com/macros/s/AKfycbwI4JgYB5Jhji1fP0qisUwJgVrf8pC3SpnT2jb6MnaVh-q92-nZI1CezC9lFtKX-00IIA/exec" rel="noopener noreferrer" target="_blank">https://script.google.com/macros/s/AKfycbwI4JgYB5Jhji1fP0qisUwJgVrf8pC3SpnT2jb6MnaVh-q92-nZI1CezC9lFtKX-00IIA/exec</a>
+  <p style="margin: 0 0 12px 0; color: #374151;">
+    This page embeds a lightweight BOM converter (Google Apps Script Web App). Upload your BOM, confirm the header row, map columns if needed, then download an upload-friendly XLSX.
   </p>
 
-  <hr style="border-bottom: 0px; border-image: initial; border-left: 0px; border-right: 0px; border-top: 1px solid rgb(229, 231, 235); border: 0; margin: 18px 0px;" />
+  <hr style="border: 0; border-top: 1px solid #e5e7eb; margin: 14px 0;" />
 
-  <h2 style="margin: 18px 0px 10px;">Distributor pages</h2>
-  <p style="color: #374151; line-height: 1.6; margin: 0px 0px 8px;">
-    After conversion, upload your result to the distributor tools:
-  </p>
+  <div style="display:flex; flex-wrap:wrap; gap:10px; align-items:center; margin: 10px 0 12px 0;">
+    <a href="https://www.digikey.com/en/resources/bom-tool" target="_blank" rel="nofollow"
+       style="display:inline-block; padding:10px 12px; border-radius:12px; background:#111827; color:#fff; text-decoration:none; font-weight:700;">
+      Digi-Key BOM Tool
+    </a>
+    <a href="https://www.mouser.com/bom/" target="_blank" rel="nofollow"
+       style="display:inline-block; padding:10px 12px; border-radius:12px; background:#1d4ed8; color:#fff; text-decoration:none; font-weight:700;">
+      Mouser BOM Tool
+    </a>
 
-  <div style="display: flex; flex-wrap: wrap; gap: 10px; margin: 10px 0px 4px;">
-    <a href="https://www.digikey.com/en/mylists" rel="noopener noreferrer" style="background: rgb(255, 255, 255); border-radius: 12px; border: 1px solid rgb(229, 231, 235); color: #111827; display: inline-block; padding: 10px 14px; text-decoration: none;" target="_blank">Open Digi-Key myLists (https://www.digikey.com/en/mylists)</a>
-
-    <a href="https://www.mouser.com/bom/" rel="noopener noreferrer" style="background: rgb(255, 255, 255); border-radius: 12px; border: 1px solid rgb(229, 231, 235); color: #111827; display: inline-block; padding: 10px 14px; text-decoration: none;" target="_blank">Open Mouser BOM Tool (https://www.mouser.com/bom/)</a>
+    <span style="font-size:12px; color:#6b7280;">
+      Tip: If the embed looks small, open the converter in a new tab.
+    </span>
   </div>
 
+  <div style="border:1px solid #e5e7eb; border-radius:14px; overflow:hidden;">
+    <div style="background:#f9fafb; padding:10px 12px; font-weight:700; color:#111827;">
+      Embedded Converter
+    </div>
+
+    <!-- IMPORTANT: Web App URL injected here -->
+    <iframe
+      id="bomConvFrame"
+      src="https://script.google.com/macros/s/AKfycbxYNm57DQNLaGaO_tvhNocL5YUAiMWbnKSRT9YSvn5g5IUWcCZRI4HapfKib_DjxGTjiA/exec"
+      style="width:100%; height: 980px; border:0; display:block;"
+      loading="lazy"
+      referrerpolicy="no-referrer-when-downgrade"
+      allow="clipboard-read; clipboard-write"
+    ></iframe>
+  </div>
+
+  <div style="margin-top: 12px; padding: 12px; border-radius: 12px; background: #f9fafb; border: 1px solid #e5e7eb; color:#374151; font-size: 13px; line-height: 1.5;">
+    <strong>Notes</strong>
+    <ul style="margin: 8px 0 0 18px;">
+      <li>For best results, your BOM should include at least: <strong>MPN(Part Number)</strong> and <strong>QTY</strong>.</li>
+      <li>If your XLSX has merged cells or formatting issues, exporting as <strong>CSV</strong> often works best.</li>
+      <li>This MVP stores temporary files in Google Drive during conversion. Use reset inside the tool if needed.</li>
+    </ul>
+  </div>
 </section>
 
-<!--iframe auto-resize (prevents modal/footer being cut on mobile)-->
 <script>
-(function(){
-  const iframe = document.getElementById('edaBomIframe');
-  if(!iframe) return;
+  // Optional: Auto-resize iframe by receiving postMessage from the embedded app
+  // The embedded index.html sends { type:"BOM_CONVERTER_HEIGHT", height: ... }
+  (function(){
+    const frame = document.getElementById('bomConvFrame');
+    if(!frame) return;
 
-  const MIN_H = 900;
-  const MAX_H = 2400;
-
-  window.addEventListener('message', function(ev){
-    try{
-      const d = ev.data;
-      if(!d || d.type !== 'EDA_BOM_IFRAME_RESIZE') return;
-      if(!d.height) return;
-      const h = Math.max(MIN_H, Math.min(MAX_H, Number(d.height)));
-      iframe.style.height = h + 'px';
-    }catch(e){}
-  });
-
-  iframe.addEventListener('load', function(){
-    iframe.style.height = Math.max(MIN_H, iframe.clientHeight || 0) + 'px';
-  });
-})();
-</script>
-
-<script type="application/ld+json">
-{
-  "@context": "https://schema.org",
-  "@graph": [
-    {
-      "@type": "SoftwareApplication",
-      "name": "EDA BOM Converter for Digi-Key and Mouser (OrCAD, Altium, KiCad, PADS)",
-      "applicationCategory": "BusinessApplication",
-      "operatingSystem": "Web",
-      "description": "EDA-agnostic BOM converter for OrCAD, Altium, KiCad, and PADS exports. Upload a BOM, preview in a guided modal (popup), click the header row, auto-detect and override MPN/Quantity columns via dropdowns, then download Mouser or Digi-Key .xlsx outputs.",
-      "offers": { "@type": "Offer", "price": "0", "priceCurrency": "USD" }
-    }
-  ]
-}
+    window.addEventListener('message', function(ev){
+      try{
+        const data = ev.data || {};
+        if(data && data.type === 'BOM_CONVERTER_HEIGHT' && typeof data.height === 'number'){
+          // Add a small padding
+          const h = Math.max(680, Math.min(2400, data.height + 40));
+          frame.style.height = h + 'px';
+        }
+      }catch(e){}
+    });
+  })();
 </script>
