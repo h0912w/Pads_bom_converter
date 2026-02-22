@@ -1,0 +1,7 @@
+Blogger.html : 구글 블로거 글에 사용하는 HTML 소스코드 입니다.
+Code.gs : Google appsscript 에 코딩된 코드입니다.
+index.html : Google appsscript 에 코딩된 코드입니다.
+appsscript.json : Google appsscript 에 코딩된 코드입니다.
+
+구글 블로거 글 내부에 Google appsscript가 연결되게 만듦
+사용자가 생성한 각종 BOM파일을 업로드 하면, 디지키 또는 마우저 형식으로 변환해주는 웹 서비스임
